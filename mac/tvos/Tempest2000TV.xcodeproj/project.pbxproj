@@ -1,0 +1,92 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1; classes = {}; objectVersion = 56;
+	objects = {
+/* Begin PBXBuildFile section */
+		T2K00000000000000000000B = {isa = PBXBuildFile; fileRef = T2K000000000000000000001; };
+		T2K00000000000000000000C = {isa = PBXBuildFile; fileRef = T2K000000000000000000002; };
+		T2K00000000000000000000D = {isa = PBXBuildFile; fileRef = T2K000000000000000000003; };
+/* End PBXBuildFile section */
+/* Begin PBXFileReference section */
+		T2K000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		T2K000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = file; path = t2000.abs; sourceTree = "<group>"; };
+		T2K000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		T2K000000000000000000004 = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		T2K000000000000000000005 = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Tempest 2000.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+/* Begin PBXFrameworksBuildPhase section */
+		T2K000000000000000000022 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+/* Begin PBXGroup section */
+		T2K000000000000000000014 = {isa = PBXGroup; children = (T2K000000000000000000015, T2K000000000000000000016); sourceTree = "<group>"; };
+		T2K000000000000000000015 = {isa = PBXGroup; children = (T2K000000000000000000001, T2K000000000000000000004, T2K000000000000000000002, T2K000000000000000000003); path = T2KTV; sourceTree = "<group>"; };
+		T2K000000000000000000016 = {isa = PBXGroup; children = (T2K000000000000000000005); name = Products; sourceTree = "<group>"; };
+/* End PBXGroup section */
+/* Begin PBXNativeTarget section */
+		T2K00000000000000000001E = {
+			isa = PBXNativeTarget; buildConfigurationList = T2K000000000000000000029;
+			buildPhases = (T2K000000000000000000020, T2K000000000000000000022, T2K000000000000000000021);
+			buildRules = (); dependencies = (); name = Tempest2000TV; productName = Tempest2000TV;
+			productReference = T2K000000000000000000005; productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+/* Begin PBXProject section */
+		T2K00000000000000000001F = {
+			isa = PBXProject; buildConfigurationList = T2K000000000000000000028; compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base);
+			mainGroup = T2K000000000000000000014; productRefGroup = T2K000000000000000000016; projectDirPath = ""; projectRoot = ""; targets = (T2K00000000000000000001E);
+		};
+/* End PBXProject section */
+/* Begin PBXResourcesBuildPhase section */
+		T2K000000000000000000021 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (T2K00000000000000000000C, T2K00000000000000000000D); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+/* Begin PBXSourcesBuildPhase section */
+		T2K000000000000000000020 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (T2K00000000000000000000B); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+/* Begin XCBuildConfiguration section */
+		T2K00000000000000000002A = {isa = XCBuildConfiguration; name = Debug; buildSettings = {
+				SDKROOT = appletvos;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 15.0;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_MODULES = YES;
+				ONLY_ACTIVE_ARCH = YES; }; };
+		T2K00000000000000000002B = {isa = XCBuildConfiguration; name = Release; buildSettings = {
+				SDKROOT = appletvos;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 15.0;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_MODULES = YES;
+				GCC_OPTIMIZATION_LEVEL = s; }; };
+		T2K00000000000000000002C = {isa = XCBuildConfiguration; name = Debug; buildSettings = {
+				PRODUCT_NAME = "Tempest 2000";
+				PRODUCT_BUNDLE_IDENTIFIER = com.jnaina.tempest2000.tv;
+				INFOPLIST_FILE = T2KTV/Info.plist;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = YCC9568JU7;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/..";
+				"OTHER_LDFLAGS[sdk=appletvos*]" = "$(SRCROOT)/libvjcore_dev.a";
+				"OTHER_LDFLAGS[sdk=appletvsimulator*]" = "$(SRCROOT)/libvjcore_sim.a";
+				GENERATE_INFOPLIST_FILE = NO;
+				}; };
+		T2K00000000000000000002D = {isa = XCBuildConfiguration; name = Release; buildSettings = {
+				PRODUCT_NAME = "Tempest 2000";
+				PRODUCT_BUNDLE_IDENTIFIER = com.jnaina.tempest2000.tv;
+				INFOPLIST_FILE = T2KTV/Info.plist;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = YCC9568JU7;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/..";
+				"OTHER_LDFLAGS[sdk=appletvos*]" = "$(SRCROOT)/libvjcore_dev.a";
+				"OTHER_LDFLAGS[sdk=appletvsimulator*]" = "$(SRCROOT)/libvjcore_sim.a";
+				GENERATE_INFOPLIST_FILE = NO;
+				}; };
+/* End XCBuildConfiguration section */
+/* Begin XCConfigurationList section */
+		T2K000000000000000000028 = {isa = XCConfigurationList; buildConfigurations = (T2K00000000000000000002A, T2K00000000000000000002B); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		T2K000000000000000000029 = {isa = XCConfigurationList; buildConfigurations = (T2K00000000000000000002C, T2K00000000000000000002D); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = T2K00000000000000000001F;
+}

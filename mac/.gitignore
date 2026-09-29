@@ -1,0 +1,6 @@
+t2k_host
+t2000.abs
+*.dylib
+*.so
+T2K.app/
+tvos/build/
