@@ -8,6 +8,7 @@
 #include <stdatomic.h>
 #include <os/lock.h>
 #include <unistd.h>
+#include <mach/mach.h>
 #include <string.h>
 #include "libretro.h"
 
@@ -26,6 +27,7 @@ static int16_t ring[RING * 2];
 static _Atomic uint32_t rd, wr;
 static bool muted;
 static _Atomic uint32_t underruns;
+static double footprint_mb(void) { task_vm_info_data_t i; mach_msg_type_number_t n = TASK_VM_INFO_COUNT; return task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&i, &n) == KERN_SUCCESS ? i.phys_footprint / 1048576.0 : 0; }
 static uint32_t ring_fill(void) { return atomic_load(&wr) - atomic_load(&rd); }
 static size_t audio_batch(const int16_t *d, size_t n) {
     uint32_t w = atomic_load(&wr), r = atomic_load(&rd);
@@ -38,7 +40,8 @@ static size_t audio_batch(const int16_t *d, size_t n) {
 static void audio_one(int16_t l, int16_t r) { int16_t s[2] = { l, r }; audio_batch(s, 1); }
 
 static void video_cb(const void *d, unsigned w, unsigned h, size_t p) { if (!d) return; g.frame = d; g.pitch = p; g.w = w; g.h = h; g.ready = true; }
-static void poll_cb(void) {}
+static void update_input(void);
+static void poll_cb(void) { update_input(); }   /* called by the core at the start of every frame */
 static int16_t input_cb(unsigned port, unsigned dev, unsigned idx, unsigned id) {
     if (port || (dev & RETRO_DEVICE_MASK) != RETRO_DEVICE_JOYPAD) return 0;
     if (id == RETRO_DEVICE_ID_JOYPAD_MASK) return (int16_t)(g.pad & 0xffff);
@@ -109,7 +112,6 @@ static void update_input(void) {
             B(RETRO_DEVICE_ID_JOYPAD_START, x.buttonMenu.isPressed);                 /* Option */
             B(RETRO_DEVICE_ID_JOYPAD_SELECT, x.buttonOptions.isPressed);             /* Pause */
         } else if (u) {
-            u.allowsRotation = YES; u.reportsAbsoluteDpadValues = NO;
             float ax = u.dpad.xAxis.value, ay = u.dpad.yAxis.value;
             B(RETRO_DEVICE_ID_JOYPAD_UP,    u.dpad.up.isPressed    || ay >  0.5f);
             B(RETRO_DEVICE_ID_JOYPAD_DOWN,  u.dpad.down.isPressed  || ay < -0.5f);
@@ -169,9 +171,15 @@ static void update_input(void) {
     _link.preferredFramesPerSecond = 60;
     [_link addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
     NSNotificationCenter *nc = NSNotificationCenter.defaultCenter;
+    [self configureControllers];
+    [nc addObserver:self selector:@selector(configureControllers) name:GCControllerDidConnectNotification object:nil];
     [nc addObserver:self selector:@selector(pause) name:UIApplicationWillResignActiveNotification object:nil];
     [nc addObserver:self selector:@selector(resume) name:UIApplicationDidBecomeActiveNotification object:nil];
     [nc addObserver:self selector:@selector(pause) name:UIApplicationDidEnterBackgroundNotification object:nil];
+}
+- (void)configureControllers {                 /* Siri Remote: swipes act as a relative D-pad, rotated to the TV */
+    for (GCController *c in GCController.controllers) if (c.microGamepad && !c.extendedGamepad) {
+        c.microGamepad.allowsRotation = YES; c.microGamepad.reportsAbsoluteDpadValues = NO; }
 }
 - (void)fail:(NSString *)msg {
     UILabel *l = [[UILabel alloc] initWithFrame:self.view.bounds]; l.text = msg; l.textColor = UIColor.whiteColor;
@@ -211,7 +219,7 @@ static void update_input(void) {
     _msum += ms; if (ms > _mmax) _mmax = ms; if (ms > 1000.0 / g.fps) _mlate++;
     if (++_mruns == 600) {
         uint32_t u = atomic_load(&underruns);
-        NSLog(@"T2K: perf 600 frames | core avg %.2f ms max %.2f ms | over budget %d | audio underruns %u", _msum / _mruns, _mmax, _mlate, u - _munder);
+        NSLog(@"T2K: perf 600 frames | core avg %.2f ms max %.2f ms | over budget %d | audio underruns %u | memory %.0f MB", _msum / _mruns, _mmax, _mlate, u - _munder, footprint_mb());
         _munder = u; _mruns = _mlate = 0; _msum = _mmax = 0;
     }
 }
@@ -236,18 +244,19 @@ static void update_input(void) {
     NSData *d = [self convert]; os_unfair_lock_lock(&_fl); _latest = d; _lw = g.w; _lh = g.h; os_unfair_lock_unlock(&_fl); g.ready = false;
 }
 - (void)emuLoop {                      /* runs the emulator flat out until the audio queue holds ~3 frames */
-    const uint32_t target = (uint32_t)(g.rate / g.fps * 3.0);
+    const uint32_t target = (uint32_t)(g.rate / g.fps * 2.0);      /* ~2 frames of audio queued: less sound lag */
     while (!_quit) {
-        [_emu lock];
-        if (_running && ring_fill() < target) {
-            CFTimeInterval a = CACurrentMediaTime(); retro_run();
-            if (g.ready) [self publish];
-            [self note:1000 * (CACurrentMediaTime() - a)]; [_emu unlock];
-        } else { [_emu unlock]; usleep(1000); }
+        @autoreleasepool {             /* this thread never returns to a run loop: without a pool every frame's NSData leaked (~18 MB/s) */
+            [_emu lock];
+            if (_running && ring_fill() < target) {
+                CFTimeInterval a = CACurrentMediaTime(); retro_run();
+                if (g.ready) [self publish];
+                [self note:1000 * (CACurrentMediaTime() - a)]; [_emu unlock];
+            } else { [_emu unlock]; usleep(300); }
+        }
     }
 }
 - (void)tick:(CADisplayLink *)l {
-    update_input();
 #ifdef T2K_MAIN_THREAD
     const uint32_t target = (uint32_t)(g.rate / g.fps * 3.0);
     int produced = 0;
