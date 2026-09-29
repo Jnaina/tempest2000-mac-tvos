@@ -79,7 +79,8 @@ t2000.abs: $(SRC_FILES) $(ROOT)/rmac/rmac $(ROOT)/rln/rln
 $(CORE_DIR)/Makefile:
 	git init -q $(CORE_DIR)
 	cd $(CORE_DIR) && git remote add origin $(CORE_URL) && git fetch -q --depth 1 origin $(CORE_SHA) \
-	    && git checkout -q FETCH_HEAD
+	    && git checkout -q FETCH_HEAD \
+	    && git apply --whitespace=nowarn $(abspath patches/virtualjaguar-blitter.patch)   # blitter specialisation, see patches/
 
 $(CORE_LIB): $(CORE_DIR)/Makefile
 	$(MAKE) -C $(CORE_DIR) -j$(NPROC)

@@ -84,3 +84,7 @@ Options: `./t2k_host --help` (`--scale N`, `--fullscreen`, `--integer`, `--scanl
   ran at ~38 fps.  Apple Silicon should be several times faster; `T2K_DEBUG=1 ./t2k_host` prints the
   frame rate each second.
 * The game source is copyrighted by its owners; `t2000.abs` is built locally and should not be redistributed.
+
+## Patches
+
+`patches/virtualjaguar-blitter.patch` (applied automatically by `make` after the core is fetched) adds the per-command blitter specialisations and the screen-clear fast path to the libretro core's `src/tom/blitter.c`.

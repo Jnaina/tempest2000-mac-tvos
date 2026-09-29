@@ -1,0 +1,113 @@
+--- a/src/tom/blitter.c	2026-09-29 19:37:42.827100503 +0800
++++ b/src/tom/blitter.c	2026-09-29 19:37:42.830311550 +0800
+@@ -550,7 +550,54 @@
+ // to optimize the blitter, then we may revisit it in the future...
+ 
+ // Generic blit handler
+-static void blitter_generic(uint32_t cmd)
++/* Constant fill of one line (Tempest 2000 clears the screen this way: ~60% of all blitted pixels).
++ * Applies only when the blit is a pure PATDSEL fill -- no source or destination read, no Z, no comparators,
++ * no clipping, no Gouraud -- onto a 16bpp, pitch-0, one-pixel-per-step destination that lies wholly in main
++ * RAM, with nothing observing the writes (blit memo, shadow framebuffers).  Then the per-pixel loop would store
++ * the same PATTERNDATA halfword n_pixels times to consecutive addresses and advance A1/A2 linearly, so do
++ * exactly that in one go.  Returns 0 (having changed nothing) whenever any condition does not hold. */
++static BLITTER_ALWAYS_INLINE int blitter_fill_line(uint32_t a1_flags)
++{
++   uint32_t n = n_pixels, x0, addr, i, k;
++   uint16_t pat[4];
++   if (((a1_flags >> 3) & 0x07) != 4 || a1_pitch != 0
++         || a1_xadd != (1 << 16) || a1_yadd != 0)
++      return 0;
++   if (blitMemoMode || shadowFBActive || shadowHiresActive)
++      return 0;
++   if (a2_mask_x != -1 || a2_mask_y != -1)
++      return 0;
++   x0 = (uint32_t)a1_x >> 16;
++   if (x0 + n > 0x10000)
++      return 0;
++   addr = a1_addr + ((((uint32_t)a1_y >> 16) * (uint32_t)a1_width + x0) << 1);
++   if (addr >= 0x200000 || addr + 2 * n > 0x200000)
++      return 0;
++   /* The pixel the loop would write at column X is READ_RDATA(PATTERNDATA, a1, ...): one constant halfword,
++    * or in phrase mode the 64-bit pattern indexed by X & 3.  Evaluate it with the loop's own macro. */
++   for (k = 0; k < 4; k++)
++   {
++      int32_t pk_x = (int32_t)(k << 16);
++      pat[k] = (uint16_t)READ_RDATA_16(PATTERNDATA, pk, a1_phrase_mode);
++   }
++   if (!a1_phrase_mode)
++      pat[1] = pat[2] = pat[3] = pat[0];
++   if (pat[0] == pat[1] && pat[1] == pat[2] && pat[2] == pat[3] && (pat[0] >> 8) == (pat[0] & 0xFF))
++      memset(&jaguarMainRAM[addr], pat[0] & 0xFF, 2 * (size_t)n);
++   else
++      for (i = 0; i < n; i++)
++      {
++         uint16_t d = pat[(x0 + i) & 3];
++         jaguarMainRAM[addr + 2 * i]     = (uint8_t)(d >> 8);
++         jaguarMainRAM[addr + 2 * i + 1] = (uint8_t)(d & 0xFF);
++      }
++   a1_x = (int32_t)((uint32_t)a1_x + (n << 16));
++   a2_x = (int32_t)((uint32_t)a2_x + n * (uint32_t)a2_xadd);
++   a2_y = (int32_t)((uint32_t)a2_y + n * (uint32_t)a2_yadd);
++   return 1;
++}
++
++static BLITTER_ALWAYS_INLINE void blitter_generic_impl(uint32_t cmd)
+ {
+    uint32_t srcdata, srczdata, dstdata, dstzdata, writedata, inhibit;
+    /* A1_FLAGS/A2_FLAGS are re-derived from blitter_ram on every textual
+@@ -578,6 +625,10 @@
+       }
+ 
+       inner_loop = n_pixels;
++      if (!DSTA2 && !SRCEN && !SRCENX && !DSTEN && !DSTENZ && PATDSEL && !GOURD && !GOURZ && !SRCSHADE
++            && !DCOMPEN && !BCOMPEN && !CLIPA1 && !Z_OP_INF && !Z_OP_EQU && !Z_OP_SUP && !DSTWRZ
++            && blitter_fill_line(a1_flags))
++         inner_loop = 0;
+       while (inner_loop--)
+       {
+          srcdata = srczdata = dstdata = dstzdata = writedata = inhibit = 0;
+@@ -1165,6 +1216,25 @@
+    WREG(A2_PIXEL,  (a2_y & 0xFFFF0000) | ((a2_x >> 16) & 0xFFFF));
+ }
+ 
++/* The general engine, compiled once with `cmd` as a run-time value ...*/
++static void blitter_generic(uint32_t cmd)
++{
++   blitter_generic_impl(cmd);
++}
++
++/* ... and once per command word that Tempest 2000 actually uses.  The body is the very same source, but with
++ * `cmd` a compile-time constant every SRCEN/DSTA2/PATDSEL/LFU/... test in the per-pixel loop is resolved by the
++ * compiler, so each copy is a tight loop for exactly that kind of blit.  Bit-exact by construction. */
++#define BLITTER_SPECIALIZE(c) \
++   static __attribute__((noinline)) void blitter_generic_##c(void) { blitter_generic_impl(0x##c); }
++BLITTER_SPECIALIZE(00010200)   /* fill / clear with PATTERNDATA          */
++BLITTER_SPECIALIZE(41802f41)   /* Gouraud-shaded Z-buffered sprite       */
++BLITTER_SPECIALIZE(09800741)   /* sprite copy with DCOMPEN transparency  */
++BLITTER_SPECIALIZE(01800005)
++BLITTER_SPECIALIZE(01800801)
++BLITTER_SPECIALIZE(00011000)   /* tiny Gouraud fills (polygon spans)     */
++#undef BLITTER_SPECIALIZE
++
+ void blitter_blit(uint32_t cmd)
+ {
+    uint32_t m, e;
+@@ -1386,7 +1456,16 @@
+          gd_ca = 0xFFFFFF00 | gd_ca;
+    }
+ 
+-   blitter_generic(cmd);
++   switch (cmd)
++   {
++      case 0x00010200: blitter_generic_00010200(); break;
++      case 0x41802f41: blitter_generic_41802f41(); break;
++      case 0x09800741: blitter_generic_09800741(); break;
++      case 0x01800005: blitter_generic_01800005(); break;
++      case 0x01800801: blitter_generic_01800801(); break;
++      case 0x00011000: blitter_generic_00011000(); break;
++      default:         blitter_generic(cmd);       break;
++   }
+ 
+    VJP_LEAVE(VJP_BLITTER);
+ }
