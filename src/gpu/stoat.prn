@@ -1,0 +1,1775 @@
+
+                                        src/gpu/stoat.gas    Page 1       5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+    1                                   ; **************************************************************************************
+    2                                   ; Welcome to the Motorola 68K Assembler source code for 'Tempest 2000' by Jeff Minter.
+    3                                   ;
+    4                                   ;                         ===================                                                                     
+    5                                   ;                    ===========================                                                                  
+    6                                   ;                 ========      ==       ==  ======                                                               
+    7                                   ;                ========        ==      ==     =====                                                             
+    8                                   ;              ====   =====       ==     ==        ====                                                           
+    9                                   ;             ===       =====     ===    ==       =====                                                           
+   10                                   ;           ========       =====   ===   ==      === ==                                                           
+   11                                   ;          === ==========    =====  ========    ===  ==                                                           
+   12                                   ;         ===       =========   =======================                                                           
+   13                                   ;       ======           ===========      ===========                                                             
+   14                                   ;       =========================        =========                                                                
+   15                                   ;       ==   ===================         ======                                                                   
+   16                                   ;       ==         ============                                                                                   
+   17                                   ;       =========================                    ==========                                                   
+   18                                   ;       ===========       ==========             =======================                                          
+   19                                   ;        ===         ==========  =========================     ==============                                     
+   20                                   ;          ===  ==========       ===================   =======           ====                                     
+   21                                   ;           =========          ====    ==   ==    ====    ========      ====                                      
+   22                                   ;             =====          ====     ==    ===     ====      =======  ===                                        
+   23                                   ;               ======     ====       ==     ==      ====         =======                                         
+   24                                   ;                  ====== ====       ==      ===       ==== ===========                                           
+   25                                   ;                     ========       ==       ==      ============                                                
+   26                                   ;                        =============        ==============                                                      
+   27                                   ;                             =========================                                                           
+   28                                   ;                                   =============                                                                 
+   29                                   ;                                                                                                                 
+   30                                   ; Fig 1. Ascii rendering of the 'spiraloid' web used in level 23 of Tempest 2000.
+   31                                   ;                                                                                                                 
+   32                                   ; This source code was originally 'leaked' by 'JaySmith2000' in August 2008,
+   33                                   ; who sold it on CD as part of a release entitled the 'Jaguar Sector II Source Code
+   34                                   ; Collection':
+   35                                   ;  https://web.archive.org/web/20131117222232/http://www.jaysmith2000.com/Jagpriceguide.htm
+   36                                   ;
+   37                                   ; This is a cleaned-up and commented version of the source code file 'stoat.gas'.
+   38                                   ;
+   39                                   ; No code has been changed, so this source file can be used to create a build
+   40                                   ; of Tempest 2000 that is byte-for-byte identical to the original 1994 release.
+   41                                   ;
+   42                                   ; All original variable and routine names are preserved.
+   43                                   ; The changes include:
+   44                                   ;   - Fixed up indentation.
+   45                                   ;   - Added comments and routine headers.
+   46                                   ;
+   47                                   ; The home of this file and the rest of the Tempest 2000 source code is:
+   48                                   ;    https://github.com/mwenge/tempest2k 
+   49                                   ;
+   50                                   ; stoat.gas contains the texter routine.
+   51                                   ; **************************************************************************************
+   52                                   
+   53                                   
+   54           =00F00000                       Base equ $f00000
+   55                                       
+   56                                           INCLUDE  "jaguar.inc"      ; Jaguar General definitions
+
+
+                                        jaguar.inc           Page 2       5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+    1                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    2                                   ;
+    3                                   ;       JAGUAR.INC  Hardware Equates for JAGUAR System
+    4                                   ;
+    5                                   ;       COPYRIGHT 1992-1995 Atari Computer Corporation
+    6                                   ;       UNAUTHORIZED REPRODUCTION, ADAPTATION, DISTRIBUTION,
+    7                                   ;       PERFORMANCE OR DISPLAY OF THIS COMPUTER PROGRAM OR
+    8                                   ;       THE ASSOCIATED AUDIOVISUAL WORK IS STRICTLY PROHIBITED.
+    9                                   ;       ALL RIGHTS RESERVED.
+   10                                   ;
+   11                                   ; Revision History:
+   12                                   ; 9/19/94 - Consolidated several files into first master JAGUAR.INC (SDS)
+   13                                   ; 2/16/95 - MF
+   14                                   ; 4/24/95 - Added UART Error Control and Mask definitions (NBK)
+   15                                   ; 5/16/95 - Added Asynchronous Serial/DAC Synonyms (SDS)
+   16                                   ; 8/08/95 - Fixed two Blitter LFU Equates, added ProController equates,
+   17                                   ;           added blitter BLITMASK flag, removed MOD_MASK/DSPINT0,
+   18                                   ;           removed private hardware register definitions.
+   19                                   ; 9/26/20 - Restored MOD_MASK/DSPINT0/GPUINT0 and private hardware register
+   20                                   ;           definitions.
+   21                                   ;
+   22                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   23                                   
+   24                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   25                                   ;      GENERIC DEFINES
+   26                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   27                                   
+   28           =00000000               DRAM            EQU     $000000 ; First system RAM location
+   29           =00004000               USERRAM         EQU     $004000 ; Beginning of non-reserved RAM
+   30           =00200000               ENDRAM          EQU     $200000 ; End of DRAM
+   31           =001FFFFC               INITSTACK       EQU     ENDRAM-4        ; Good place to initialize stack
+   32                                   
+   33                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   34                                   ;      CPU REGISTERS
+   35                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   36                                   
+   37           =00000100               LEVEL0          EQU     $100            ; 68000 Level 0 Autovector Interrupt
+   38           =00000100               USER0           EQU     $100            ; Pseudonym for LEVEL0
+   39                                   
+   40                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   41                                   ; Masks for INT1 CPU Interrupt Control Register
+   42                                   
+   43           =00000001               C_VIDENA        EQU     $0001           ; Enable Video time-base interrupts
+   44           =00000002               C_GPUENA        EQU     $0002           ; Enable GPU register-write interrupt
+   45           =00000004               C_OPENA         EQU     $0004           ; Enable OP stop-object interrupt
+   46           =00000008               C_PITENA        EQU     $0008           ; Enable PIT interrupt
+   47           =00000010               C_JERENA        EQU     $0010           ; Enable Jerry interrupt
+   48                                   
+   49           =00000100               C_VIDCLR        EQU     $0100           ; Clear pending video interrupts
+   50           =00000200               C_GPUCLR        EQU     $0200           ; Clear pending GPU interrupts
+   51           =00000400               C_OPCLR         EQU     $0400           ; Clear pending OP interrupts
+   52           =00000800               C_PITCLR        EQU     $0800           ; Clear pending PIT interrupts
+   53           =00001000               C_JERCLR        EQU     $1000           ; Clear pending Jerry interrupts
+   54                                   
+   55                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   56                                   ;       JAGUAR REGISTERS
+
+
+                                        jaguar.inc           Page 3       5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+   57                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   58                                   
+   59           =00F00000               BASE            EQU     $F00000 ; TOM Internal Register Base
+   60                                   
+   61                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   62                                   ;       TOM REGISTERS
+   63                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   64                                   
+   65           =00F00004               HC              EQU     BASE + 4        ; Horizontal Count
+   66           =00F00006               VC              EQU     BASE + 6        ; Vertical Count
+   67           =00F00008               LPH             EQU     BASE + 8        ; Horizontal Lightpen
+   68           =00F0000A               LPV             EQU     BASE + $0A      ; Vertical Lightpen
+   69           =00F00010               OB0             EQU     BASE + $10      ; Current Object Phrase
+   70           =00F00012               OB1             EQU     BASE + $12
+   71           =00F00014               OB2             EQU     BASE + $14
+   72           =00F00016               OB3             EQU     BASE + $16
+   73           =00F00020               OLP             EQU     BASE + $20      ; Object List Pointer
+   74           =00F00026               OBF             EQU     BASE + $26      ; Object Processor Flag
+   75           =00F00028               VMODE           EQU     BASE + $28      ; Video Mode
+   76           =00F0002A               BORD1           EQU     BASE + $2A      ; Border Color (Red & Green)
+   77           =00F0002C               BORD2           EQU     BASE + $2C      ; Border Color (Blue)
+   78           =00F00038               HDB1            EQU     BASE + $38      ; Horizontal Display Begin One
+   79           =00F0003A               HDB2            EQU     BASE + $3A      ; Horizontal Display Begin Two
+   80           =00F0003C               HDE             EQU     BASE + $3C      ; Horizontal Display End
+   81           =00F00044               VS              EQU     BASE + $44      ; Vertical Sync
+   82           =00F00046               VDB             EQU     BASE + $46      ; Vertical Display Begin
+   83           =00F00048               VDE             EQU     BASE + $48      ; Vertical Display End
+   84           =00F0004E               VI              EQU     BASE + $4E      ; Vertical Interrupt
+   85           =00F00050               PIT0            EQU     BASE + $50      ; Programmable Interrupt Timer (Lo)
+   86           =00F00052               PIT1            EQU     BASE + $52      ; Programmable Interrupt Timer (Hi)
+   87           =00F00058               BG              EQU     BASE + $58      ; Background Color
+   88                                   
+   89           =00F000E0               INT1            EQU     BASE + $E0      ; CPU Interrupt Control Register
+   90           =00F000E2               INT2            EQU     BASE + $E2      ; CPU Interrupt Resume Register
+   91                                   
+   92           =00F00400               CLUT            EQU     BASE + $400     ; Color Lookup Table
+   93                                   
+   94           =00F00800               LBUFA           EQU     BASE + $800     ; Line Buffer A
+   95           =00F01000               LBUFB           EQU     BASE + $1000    ; Line Buffer B
+   96           =00F01800               LBUFC           EQU     BASE + $1800    ; Line Buffer Current
+   97                                   
+   98                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   99                                   ;      OBJECT PROCESSOR EQUATES
+  100                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  101                                   
+  102           =00000000               BITOBJ          EQU     0
+  103           =00000001               SCBITOBJ        EQU     1
+  104           =00000002               GPUOBJ          EQU     2
+  105           =00000003               BRANCHOBJ       EQU     3
+  106           =00000004               STOPOBJ         EQU     4
+  107                                   
+  108           =00002000               O_REFLECT       EQU     $00002000       ; OR with top LONG of BITMAP object
+  109           =00004000               O_RMW           EQU     $00004000
+  110           =00008000               O_TRANS         EQU     $00008000
+  111           =00010000               O_RELEASE       EQU     $00010000
+  112                                   
+
+
+                                        jaguar.inc           Page 4       5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  113           =00000000               O_DEPTH1        EQU     (0<<12) ; DEPTH Field for BITMAP objects
+  114           =00001000               O_DEPTH2        EQU     (1<<12)
+  115           =00002000               O_DEPTH4        EQU     (2<<12)
+  116           =00003000               O_DEPTH8        EQU     (3<<12)
+  117           =00004000               O_DEPTH16       EQU     (4<<12)
+  118           =00005000               O_DEPTH32       EQU     (5<<12)
+  119                                   
+  120           =00008000               O_NOGAP         EQU     (1<<15) ; Phrase GAP between image phrases
+  121           =00010000               O_1GAP          EQU     (2<<15)
+  122           =00018000               O_2GAP          EQU     (3<<15)
+  123           =00020000               O_3GAP          EQU     (4<<15)
+  124           =00028000               O_4GAP          EQU     (5<<15)
+  125           =00030000               O_5GAP          EQU     (6<<15)
+  126           =00038000               O_6GAP          EQU     (7<<15)
+  127                                   
+  128           =00000000               O_BREQ          EQU     (0<<14) ; CC field of BRANCH objects
+  129           =00004000               O_BRGT          EQU     (1<<14)
+  130           =00008000               O_BRLT          EQU     (2<<14)
+  131           =0000C000               O_BROP          EQU     (3<<14)
+  132           =00010000               O_BRHALF        EQU     (4<<14)
+  133                                   
+  134           =00000008               O_STOPINTS      EQU     $00000008       ; Enable Interrupts in STOP object
+  135                                   
+  136                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  137                                   ;      VIDEO INITIALIZATION CONSTANTS
+  138                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  139                                   
+  140           =00000581               NTSC_WIDTH      EQU     1409            ; Width of screen in pixel clocks
+  141           =00000337               NTSC_HMID       EQU     823             ; Middle of screen in pixel clocks
+  142           =000000F1               NTSC_HEIGHT     EQU     241             ; Height of screen in scanlines
+  143           =0000010A               NTSC_VMID       EQU     266             ; Middle of screen in halflines
+  144                                   
+  145           =00000565               PAL_WIDTH       EQU     1381            ; Same as above for PAL...
+  146           =0000034B               PAL_HMID        EQU     843
+  147           =0000011F               PAL_HEIGHT      EQU     287
+  148           =00000142               PAL_VMID        EQU     322
+  149                                   
+  150                                   ;;; The following mask will extract the PAL/NTSC flag bit from the
+  151                                   ;;; CONFIG register. NTSC = Bit Set, PAL = Bit Clear
+  152                                   
+  153           =00000010               VIDTYPE         EQU     $10
+  154                                   
+  155                                   ;;; The following are Video Mode register flags
+  156                                   
+  157           =00000001               VIDEN           EQU     $0001           ; Enable video-time base generator
+  158                                   
+  159           =00000000               CRY16           EQU     $0000           ; Enable 16-bit CRY mode
+  160           =00000002               RGB24           EQU     $0002           ; Enable 24-bit RGB mode
+  161           =00000004               DIRECT16        EQU     $0004           ; Enable 16-bit DIRECT mode
+  162           =00000006               RGB16           EQU     $0006           ; Enable 16-bit RGB mode
+  163                                   
+  164           =00000008               GENLOCK         EQU     $0008           ; Not Supported in Jaguar Console
+  165           =00000010               INCEN           EQU     $0010           ; Enable encrustation
+  166           =00000020               BINC            EQU     $0020           ; Select local border color
+  167           =00000040               CSYNC           EQU     $0040           ; Enable composite sync
+  168           =00000080               BGEN            EQU     $0080           ; Clear line buffer to BG
+
+
+                                        jaguar.inc           Page 5       5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  169           =00000100               VARMOD          EQU     $0100           ; Enable variable-color resolution mode
+  170                                   
+  171           =00000000               PWIDTH1         EQU     $0000           ; Select pixels 1 clock wide
+  172           =00000200               PWIDTH2         EQU     $0200           ; Select pixels 2 clocks wide
+  173           =00000400               PWIDTH3         EQU     $0400           ; Select pixels 3 clocks wide
+  174           =00000600               PWIDTH4         EQU     $0600           ; Select pixels 4 clocks wide
+  175           =00000800               PWIDTH5         EQU     $0800           ; Select pixels 5 clocks wide
+  176           =00000A00               PWIDTH6         EQU     $0A00           ; Select pixels 6 clocks wide
+  177           =00000C00               PWIDTH7         EQU     $0C00           ; Select pixels 7 clocks wide
+  178           =00000E00               PWIDTH8         EQU     $0E00           ; Select pixels 8 clocks wide
+  179                                   
+  180                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  181                                   ;       GPU REGISTERS
+  182                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  183                                   
+  184           =00F02100               G_FLAGS         EQU     BASE + $2100    ; GPU Flags
+  185           =00F02104               G_MTXC          EQU     BASE + $2104    ; GPU Matrix Control
+  186           =00F02108               G_MTXA          EQU     BASE + $2108    ; GPU Matrix Address
+  187           =00F0210C               G_END           EQU     BASE + $210C    ; GPU Data Organization
+  188           =00F02110               G_PC            EQU     BASE + $2110    ; GPU Program Counter
+  189           =00F02114               G_CTRL          EQU     BASE + $2114    ; GPU Operation Control/Status
+  190           =00F02114               GPUCTRL          EQU     BASE + $2114    ; GPU Operation Control/Status
+  191           =00F02118               G_HIDATA        EQU     BASE + $2118    ; GPU Bus Interface high data
+  192           =00F0211C               G_REMAIN        EQU     BASE + $211C    ; GPU Division Remainder
+  193           =00F0211C               G_DIVCTRL       EQU     BASE + $211C    ; GPU Divider control
+  194           =00F03000               G_RAM           EQU     BASE + $3000    ; GPU Internal RAM
+  195           =00F04000               G_ENDRAM        EQU     G_RAM +(4*1024) ; 4K bytes
+  196                                   
+  197           =00F02100               GPU_FLAGS         EQU     BASE + $2100    ; GPU Flags
+  198           =00F02104               GPU_MTXC          EQU     BASE + $2104    ; GPU Matrix Control
+  199           =00F02108               GPU_MTXA          EQU     BASE + $2108    ; GPU Matrix Address
+  200           =00F0210C               GPU_END           EQU     BASE + $210C    ; GPU Data Organization
+  201           =00F02110               GPU_PC            EQU     BASE + $2110    ; GPU Program Counter
+  202           =00F02114               GPU_CTRL          EQU     BASE + $2114    ; GPU Operation Control/Status
+  203           =00F02118               GPU_HIDATA        EQU     BASE + $2118    ; GPU Bus Interface high data
+  204           =00F0211C               GPU_REMAIN        EQU     BASE + $211C    ; GPU Division Remainder
+  205           =00F0211C               GPU_DIVCTRL       EQU     BASE + $211C    ; GPU Divider control
+  206           =00F03000               GPU_RAM           EQU     BASE + $3000    ; GPU Internal RAM
+  207           =00F04000               GPU_ENDRAM        EQU     GPU_RAM +(4*1024) ; 4K bytes
+  208                                   
+  209                                   ;;;
+  210                                   ;;; GPU Flags Register Equates
+  211                                   ;;;
+  212                                   
+  213           =00000010               G_CPUENA        EQU     $00000010       ; CPU Interrupt enable bits
+  214           =00000020               G_DSPENA        EQU     $00000020       ; DSP Interrupt enable bits
+  215           =00000040               G_PITENA        EQU     $00000040       ; PIT Interrupt enable bits
+  216           =00000080               G_OPENA         EQU     $00000080       ; Object Processor Interrupt enable bits
+  217           =00000100               G_BLITENA       EQU     $00000100       ; Blitter Interrupt enable bits
+  218           =00000200               G_CPUCLR        EQU     $00000200       ; CPU Interrupt clear bits
+  219           =00000400               G_DSPCLR        EQU     $00000400       ; DSP Interrupt clear bits
+  220           =00000800               G_PITCLR        EQU     $00000800       ; PIT Interrupt clear bits
+  221           =00001000               G_OPCLR         EQU     $00001000       ; Object Processor Interrupt clear bits
+  222           =00002000               G_BLITCLR       EQU     $00002000       ; Blitter Interrupt clear bits
+  223                                   
+  224                                   ;;;
+
+
+                                        jaguar.inc           Page 6       5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  225                                   ;;; GPU Control/Status Register
+  226                                   ;;;
+  227                                   
+  228           =00000001               GPUGO           EQU     $00000001       ; Start and Stop the GPU
+  229           =00000004               GPUINT0         EQU     $00000004       ; generate a GPU type 0 interrupt
+  230                                   
+  231           =00000040               G_CPULAT        EQU     $00000040       ; Interrupt Latches
+  232           =00000080               G_DSPLAT        EQU     $00000080
+  233           =00000100               G_PITLAT        EQU     $00000100
+  234           =00000200               G_OPLAT         EQU     $00000200
+  235           =00000400               G_BLITLAT       EQU     $00000400
+  236                                   
+  237                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  238                                   ;       BLITTER REGISTERS
+  239                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  240                                   
+  241           =00F02200               A1_BASE         EQU     BASE + $2200    ; A1 Base Address
+  242           =00F02204               A1_FLAGS        EQU     BASE + $2204    ; A1 Control Flags
+  243           =00F02208               A1_CLIP         EQU     BASE + $2208    ; A1 Clipping Size
+  244           =00F0220C               A1_PIXEL        EQU     BASE + $220C    ; A1 Pixel Pointer
+  245           =00F02210               A1_STEP         EQU     BASE + $2210    ; A1 Step (Integer Part)
+  246           =00F02214               A1_FSTEP        EQU     BASE + $2214    ; A1 Step (Fractional Part)
+  247           =00F02218               A1_FPIXEL       EQU     BASE + $2218    ; A1 Pixel Pointer (Fractional)
+  248           =00F0221C               A1_INC          EQU     BASE + $221C    ; A1 Increment (Integer Part)
+  249           =00F02220               A1_FINC         EQU     BASE + $2220    ; A1 Increment (Fractional Part)
+  250           =00F02224               A2_BASE         EQU     BASE + $2224    ; A2 Base Address
+  251           =00F02228               A2_FLAGS        EQU     BASE + $2228    ; A2 Control Flags
+  252           =0000C000               A2_MASK         EQU     $0000 + $C000    ; A2 Address Mask
+  253           =00F02230               A2_PIXEL        EQU     BASE + $2230    ; A2 PIXEL
+  254           =00F02234               A2_STEP         EQU     BASE + $2234    ; A2 Step (Integer)
+  255                                   
+  256           =00F02200               BLIT_A1BASE         EQU     BASE + $2200    ; A1 Base Address
+  257           =00F02204               BLIT_A1FLAGS        EQU     BASE + $2204    ; A1 Control Flags
+  258           =00F02208               BLIT_A1CLIP         EQU     BASE + $2208    ; A1 Clipping Size
+  259           =00F0220C               BLIT_A1PIXEL        EQU     BASE + $220C    ; A1 Pixel Pointer
+  260           =00F02210               BLIT_A1STEP         EQU     BASE + $2210    ; A1 Step (Integer Part)
+  261           =00F02214               BLIT_A1FSTEP        EQU     BASE + $2214    ; A1 Step (Fractional Part)
+  262           =00F02218               BLIT_A1PIXELF       EQU     BASE + $2218    ; A1 Pixel Pointer (Fractional)
+  263           =00F0221C               BLIT_A1INC          EQU     BASE + $221C    ; A1 Increment (Integer Part)
+  264           =00F02220               BLIT_A1INCF         EQU     BASE + $2220    ; A1 Increment (Fractional Part)
+  265           =00F02224               BLIT_A2BASE         EQU     BASE + $2224    ; A2 Base Address
+  266           =00F02228               BLIT_A2FLAGS        EQU     BASE + $2228    ; A2 Control Flags
+  267           =00F0222C               BLIT_A2MASK         EQU     BASE + $222C    ; A2 Address Mask
+  268           =00F0222C               A2MASK              EQU     BASE + $222C    ; A2 Address Mask
+  269           =00F02230               BLIT_A2PIXEL        EQU     BASE + $2230    ; A2 PIXEL
+  270           =00F02234               BLIT_A2STEP         EQU     BASE + $2234    ; A2 Step (Integer)
+  271                                   
+  272           =00F02238               B_CMD           EQU     BASE + $2238    ; Command
+  273           =00F0223C               B_COUNT         EQU     BASE + $223C    ; Counters
+  274           =00F02240               B_SRCD          EQU     BASE + $2240    ; Source Data
+  275           =00F02248               B_DSTD          EQU     BASE + $2248    ; Destination Data
+  276           =00F02250               B_DSTZ          EQU     BASE + $2250    ; Destination Z
+  277           =00F02258               B_SRCZ1         EQU     BASE + $2258    ; Source Z (Integer)
+  278           =00F02260               B_SRCZ2         EQU     BASE + $2260    ; Source Z (Fractional)
+  279           =00F02268               B_PATD          EQU     BASE + $2268    ; Pattern Data
+  280           =00F02270               B_IINC          EQU     BASE + $2270    ; Intensity Increment
+
+
+                                        jaguar.inc           Page 7       5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  281           =00F02274               B_ZINC          EQU     BASE + $2274    ; Z Increment
+  282           =00F02278               B_STOP          EQU     BASE + $2278    ; Collision stop control
+  283                                   
+  284           =00F02238               BLIT_CMD           EQU     BASE + $2238    ; Command
+  285           =00F0223C               BLIT_COUNT         EQU     BASE + $223C    ; Counters
+  286           =00F02240               BLIT_SRCD          EQU     BASE + $2240    ; Source Data
+  287           =00F02248               BLIT_DSTD          EQU     BASE + $2248    ; Destination Data
+  288           =00F02250               BLIT_DSTZ          EQU     BASE + $2250    ; Destination Z
+  289           =00F02258               BLIT_SRCZ1         EQU     BASE + $2258    ; Source Z (Integer)
+  290           =00F02260               BLIT_SRCZ2         EQU     BASE + $2260    ; Source Z (Fractional)
+  291           =00F02268               BLIT_PATD          EQU     BASE + $2268    ; Pattern Data
+  292           =00F02270               BLIT_IINC          EQU     BASE + $2270    ; Intensity Increment
+  293           =00F02274               BLIT_ZINC          EQU     BASE + $2274    ; Z Increment
+  294           =00F02278               BLIT_STOP          EQU     BASE + $2278    ; Collision stop control
+  295                                   
+  296           =00F0227C               B_I3            EQU     BASE + $227C    ; Blitter Intensity 3
+  297           =00F02280               B_I2            EQU     BASE + $2280    ; Blitter Intensity 2
+  298           =00F02284               B_I1            EQU     BASE + $2284    ; Blitter Intensity 1
+  299           =00F02288               B_I0            EQU     BASE + $2288    ; Blitter Intensity 0
+  300                                   
+  301           =00F0228C               B_Z3            EQU     BASE + $228C    ; Blitter Z 3
+  302           =00F02290               B_Z2            EQU     BASE + $2290    ; Blitter Z 2
+  303           =00F02294               B_Z1            EQU     BASE + $2294    ; Blitter Z 1
+  304           =00F02298               B_Z0            EQU     BASE + $2298    ; Blitter Z 0
+  305                                   
+  306                                   ;;;
+  307                                   ;;; BLITTER Command Register equates
+  308                                   ;;;
+  309                                   
+  310           =00000001               SRCEN           EQU     $00000001       ; d00:     source data read (inner loop)
+  311           =00000002               SRCENZ          EQU     $00000002       ; d01:     source Z read (inner loop)
+  312           =00000004               SRCENX          EQU     $00000004       ; d02:     source data read (realign)
+  313           =00000008               DSTEN           EQU     $00000008       ; d03:     dest data read (inner loop)
+  314           =00000010               DSTENZ          EQU     $00000010       ; d04:     dest Z read (inner loop)
+  315           =00000020               DSTWRZ          EQU     $00000020       ; d05:     dest Z write (inner loop)
+  316           =00000040               CLIP_A1         EQU     $00000040       ; d06:     A1 clipping enable
+  317           =00000100               UPDA1F          EQU     $00000100       ; d08:     A1 update step fraction
+  318           =00000200               UPDA1           EQU     $00000200       ; d09:     A1 update step
+  319           =00000400               UPDA2           EQU     $00000400       ; d10:     A2 update step
+  320           =00000800               DSTA2           EQU     $00000800       ; d11:     reverse usage of A1 and A2
+  321           =00001000               GOURD           EQU     $00001000       ; d12:     enable Gouraud shading
+  322           =00002000               ZBUFF           EQU     $00002000       ; d13:     polygon Z data updates
+  323           =00004000               TOPBEN          EQU     $00004000       ; d14:     intensity carry into byte
+  324           =00008000               TOPNEN          EQU     $00008000       ; d15:     intensity carry into nibble
+  325           =00010000               PATDSEL         EQU     $00010000       ; d16:     Select pattern data
+  326           =00020000               ADDDSEL         EQU     $00020000       ; d17:     diagnostic
+  327                                                                           ; d18-d20: Z comparator inhibit
+  328           =00040000               ZMODELT         EQU     $00040000       ;            source < destination
+  329           =00080000               ZMODEEQ         EQU     $00080000       ;            source = destination
+  330           =00100000               ZMODEGT         EQU     $00100000       ;            source > destination
+  331                                                                           ; d21-d24: Logic function control
+  332           =00200000               LFU_NAN         EQU     $00200000       ;            !source & !destination
+  333           =00400000               LFU_NA          EQU     $00400000       ;            !source &  destination
+  334           =00800000               LFU_AN          EQU     $00800000       ;             source & !destination
+  335           =01000000               LFU_A           EQU     $01000000       ;             source &  destination
+  336                                   
+
+
+                                        jaguar.inc           Page 8       5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  337           =02000000               CMPDST          EQU     $02000000       ; d25:     pixel compare pattern & dest
+  338           =04000000               BCOMPEN         EQU     $04000000       ; d26:     bit compare write inhibit
+  339           =08000000               DCOMPEN         EQU     $08000000       ; d27:     data compare write inhibit
+  340           =10000000               BKGWREN         EQU     $10000000       ; d28:     data write back
+  341           =20000000               BUSHI           EQU     $20000000       ; d29      blitter priority
+  342           =40000000               SRCSHADE        EQU     $40000000       ; d30:     shade src data w/IINC value
+  343                                   
+  344                                   ;;;
+  345                                   ;;; The following are ALL 16 possible logical operations of the LFUs
+  346                                   ;;;
+  347                                   
+  348           =00000000               LFU_ZERO        EQU     $00000000       ; All Zeros
+  349           =00200000               LFU_NSAND       EQU     $00200000       ; NOT Source AND NOT Destination
+  350           =00400000               LFU_NSAD        EQU     $00400000       ; NOT Source AND Destination
+  351           =00600000               LFU_NOTS        EQU     $00600000       ; NOT Source
+  352           =00800000               LFU_SAND        EQU     $00800000       ; Source AND NOT Destination
+  353           =00A00000               LFU_NOTD        EQU     $00A00000       ; NOT Destination
+  354           =00C00000               LFU_SXORD       EQU     $00C00000       ; Source XOR Destination
+  355           =00E00000               LFU_NSORND      EQU     $00E00000       ; NOT Source OR NOT Destination
+  356           =01000000               LFU_SAD         EQU     $01000000       ; Source AND Destination
+  357           =01200000               LFU_N_SXORD     EQU     $01200000       ; NOT (Source XOR Destination)
+  358           =01400000               LFU_D           EQU     $01400000       ; Destination
+  359           =01600000               LFU_NSORD       EQU     $01600000       ; NOT Source OR Destination
+  360           =01800000               LFU_S           EQU     $01800000       ; Source
+  361           =01A00000               LFU_SORND       EQU     $01A00000       ; Source OR NOT Destination
+  362           =01C00000               LFU_SORD        EQU     $01C00000       ; Source OR Destination
+  363           =01E00000               LFU_ONE         EQU     $01E00000       ; All Ones
+  364                                   
+  365                                   ; These are some common combinations with less boolean names
+  366                                   
+  367           =01800000               LFU_REPLACE     EQU     $01800000       ; Source REPLACEs destination
+  368           =00C00000               LFU_XOR         EQU     $00C00000       ; Source XOR with destination
+  369           =00000000               LFU_CLEAR       EQU     $00000000       ; CLEAR destination
+  370                                   
+  371                                   ;;;
+  372                                   ;;; BLITTER Flags (A1 or A2) register equates
+  373                                   ;;;
+  374                                   
+  375                                   ; Pitch d00-d01:
+  376                                   ;       distance between pixel phrases
+  377           =00000000               PITCH1          EQU     $00000000       ; 0 phrase gap
+  378           =00000001               PITCH2          EQU     $00000001       ; 1 phrase gap
+  379           =00000002               PITCH4          EQU     $00000002       ; 3 phrase gap
+  380           =00000003               PITCH3          EQU     $00000003       ; 2 phrase gap
+  381                                   
+  382                                   ; Pixel d03-d05
+  383                                   ;       bit depth (2^n)
+  384           =00000000               PIXEL1          EQU     $00000000       ; n = 0
+  385           =00000008               PIXEL2          EQU     $00000008       ; n = 1
+  386           =00000010               PIXEL4          EQU     $00000010       ; n = 2
+  387           =00000018               PIXEL8          EQU     $00000018       ; n = 3
+  388           =00000020               PIXEL16         EQU     $00000020       ; n = 4
+  389           =00000028               PIXEL32         EQU     $00000028       ; n = 5
+  390                                   
+  391                                   ; Z offset d06-d08
+  392                                   ;       offset from phrase of pixel data from its corresponding
+
+
+                                        jaguar.inc           Page 9       5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  393                                   ;       Z data phrases
+  394           =00000000               ZOFFS0          EQU     $00000000       ; offset = 0    UNUSED
+  395           =00000040               ZOFFS1          EQU     $00000040       ; offset = 1
+  396           =00000080               ZOFFS2          EQU     $00000080       ; offset = 2
+  397           =000000C0               ZOFFS3          EQU     $000000C0       ; offset = 3
+  398           =00000100               ZOFFS4          EQU     $00000100       ; offset = 4
+  399           =00000140               ZOFFS5          EQU     $00000140       ; offset = 5
+  400           =00000180               ZOFFS6          EQU     $00000180       ; offset = 6
+  401           =000001C0               ZOFFS7          EQU     $000001C0       ; offset = 7    UNUSED
+  402                                   
+  403                                   ; Width d09-d14
+  404                                   ;       width used for address generation
+  405                                   ;       This is a 6-bit floating point value in pixels
+  406                                   ;       4-bit unsigned exponent
+  407                                   ;       2-bit mantissa with implied 3rd bit of 1
+  408           =00000800               WID2            EQU     $00000800       ; 1.00 X 2^1  ( 4<<9)
+  409           =00001000               WID4            EQU     $00001000       ; 1.00 X 2^2  ( 8<<9)
+  410           =00001400               WID6            EQU     $00001400       ; 1.10 X 2^2  (10<<9)
+  411           =00001800               WID8            EQU     $00001800       ; 1.00 x 2^3  (12<<9)
+  412           =00001A00               WID10           EQU     $00001A00       ; 1.01 X 2^3  (13<<9)
+  413           =00001C00               WID12           EQU     $00001C00       ; 1.10 X 2^3  (14<<9)
+  414           =00001E00               WID14           EQU     $00001E00       ; 1.11 X 2^3  (15<<9)
+  415           =00002000               WID16           EQU     $00002000       ; 1.00 X 2^4  (16<<9)
+  416           =00002200               WID20           EQU     $00002200       ; 1.01 X 2^4  (17<<9)
+  417           =00002400               WID24           EQU     $00002400       ; 1.10 X 2^4  (18<<9)
+  418           =00002600               WID28           EQU     $00002600       ; 1.11 X 2^4  (19<<9)
+  419           =00002800               WID32           EQU     $00002800       ; 1.00 X 2^5  (20<<9)
+  420           =00002A00               WID40           EQU     $00002A00       ; 1.01 X 2^5  (21<<9)
+  421           =00002C00               WID48           EQU     $00002C00       ; 1.10 X 2^5  (22<<9)
+  422           =00002E00               WID56           EQU     $00002E00       ; 1.11 X 2^5  (23<<9)
+  423           =00003000               WID64           EQU     $00003000       ; 1.00 X 2^6  (24<<9)
+  424           =00003200               WID80           EQU     $00003200       ; 1.01 X 2^6  (25<<9)
+  425           =00003400               WID96           EQU     $00003400       ; 1.10 X 2^6  (26<<9)
+  426           =00003600               WID112          EQU     $00003600       ; 1.11 X 2^6  (27<<9)
+  427           =00003800               WID128          EQU     $00003800       ; 1.00 X 2^7  (28<<9)
+  428           =00003A00               WID160          EQU     $00003A00       ; 1.01 X 2^7  (29<<9)
+  429           =00003C00               WID192          EQU     $00003C00       ; 1.10 X 2^7  (30<<9)
+  430           =00003E00               WID224          EQU     $00003E00       ; 1.11 X 2^7  (31<<9)
+  431           =00004000               WID256          EQU     $00004000       ; 1.00 X 2^8  (32<<9)
+  432           =00004200               WID320          EQU     $00004200       ; 1.01 X 2^8  (33<<9)
+  433           =00004400               WID384          EQU     $00004400       ; 1.10 X 2^8  (34<<9)
+  434           =00004600               WID448          EQU     $00004600       ; 1.11 X 2^8  (35<<9)
+  435           =00004800               WID512          EQU     $00004800       ; 1.00 X 2^9  (36<<9)
+  436           =00004A00               WID640          EQU     $00004A00       ; 1.01 X 2^9  (37<<9)
+  437           =00004C00               WID768          EQU     $00004C00       ; 1.10 X 2^9  (38<<9)
+  438           =00004E00               WID896          EQU     $00004E00       ; 1.11 X 2^9  (39<<9)
+  439           =00005000               WID1024         EQU     $00005000       ; 1.00 X 2^10 (40<<9)
+  440           =00005200               WID1280         EQU     $00005200       ; 1.01 X 2^10 (41<<9)
+  441           =00005400               WID1536         EQU     $00005400       ; 1.10 X 2^10 (42<<9)
+  442           =00005600               WID1792         EQU     $00005600       ; 1.11 X 2^10 (43<<9)
+  443           =00005800               WID2048         EQU     $00005800       ; 1.00 X 2^11 (44<<9)
+  444           =00005A00               WID2560         EQU     $00005A00       ; 1.01 X 2^11 (45<<9)
+  445           =00005C00               WID3072         EQU     $00005C00       ; 1.10 X 2^11 (46<<9)
+  446           =00005E00               WID3584         EQU     $00005E00       ; 1.11 X 2^11 (47<<9)
+  447                                   
+  448           =00000800               WIDTH2            EQU     $00000800       ; 1.00 X 2^1  ( 4<<9)
+
+
+                                        jaguar.inc           Page 10      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  449           =00001000               WIDTH4            EQU     $00001000       ; 1.00 X 2^2  ( 8<<9)
+  450           =00001400               WIDTH6            EQU     $00001400       ; 1.10 X 2^2  (10<<9)
+  451           =00001800               WIDTH8            EQU     $00001800       ; 1.00 x 2^3  (12<<9)
+  452           =00001A00               WIDTH10           EQU     $00001A00       ; 1.01 X 2^3  (13<<9)
+  453           =00001C00               WIDTH12           EQU     $00001C00       ; 1.10 X 2^3  (14<<9)
+  454           =00001E00               WIDTH14           EQU     $00001E00       ; 1.11 X 2^3  (15<<9)
+  455           =00002000               WIDTH16           EQU     $00002000       ; 1.00 X 2^4  (16<<9)
+  456           =00002200               WIDTH20           EQU     $00002200       ; 1.01 X 2^4  (17<<9)
+  457           =00002400               WIDTH24           EQU     $00002400       ; 1.10 X 2^4  (18<<9)
+  458           =00002600               WIDTH28           EQU     $00002600       ; 1.11 X 2^4  (19<<9)
+  459           =00002800               WIDTH32           EQU     $00002800       ; 1.00 X 2^5  (20<<9)
+  460           =00002A00               WIDTH40           EQU     $00002A00       ; 1.01 X 2^5  (21<<9)
+  461           =00002C00               WIDTH48           EQU     $00002C00       ; 1.10 X 2^5  (22<<9)
+  462           =00002E00               WIDTH56           EQU     $00002E00       ; 1.11 X 2^5  (23<<9)
+  463           =00003000               WIDTH64           EQU     $00003000       ; 1.00 X 2^6  (24<<9)
+  464           =00003200               WIDTH80           EQU     $00003200       ; 1.01 X 2^6  (25<<9)
+  465           =00003400               WIDTH96           EQU     $00003400       ; 1.10 X 2^6  (26<<9)
+  466           =00003600               WIDTH112          EQU     $00003600       ; 1.11 X 2^6  (27<<9)
+  467           =00003800               WIDTH128          EQU     $00003800       ; 1.00 X 2^7  (28<<9)
+  468           =00003A00               WIDTH160          EQU     $00003A00       ; 1.01 X 2^7  (29<<9)
+  469           =00003C00               WIDTH192          EQU     $00003C00       ; 1.10 X 2^7  (30<<9)
+  470           =00003E00               WIDTH224          EQU     $00003E00       ; 1.11 X 2^7  (31<<9)
+  471           =00004000               WIDTH256          EQU     $00004000       ; 1.00 X 2^8  (32<<9)
+  472           =00004200               WIDTH320          EQU     $00004200       ; 1.01 X 2^8  (33<<9)
+  473           =00004400               WIDTH384          EQU     $00004400       ; 1.10 X 2^8  (34<<9)
+  474           =00004600               WIDTH448          EQU     $00004600       ; 1.11 X 2^8  (35<<9)
+  475           =00004800               WIDTH512          EQU     $00004800       ; 1.00 X 2^9  (36<<9)
+  476           =00004A00               WIDTH640          EQU     $00004A00       ; 1.01 X 2^9  (37<<9)
+  477           =00004C00               WIDTH768          EQU     $00004C00       ; 1.10 X 2^9  (38<<9)
+  478           =00004E00               WIDTH896          EQU     $00004E00       ; 1.11 X 2^9  (39<<9)
+  479           =00005000               WIDTH1024         EQU     $00005000       ; 1.00 X 2^10 (40<<9)
+  480           =00005200               WIDTH1280         EQU     $00005200       ; 1.01 X 2^10 (41<<9)
+  481           =00005400               WIDTH1536         EQU     $00005400       ; 1.10 X 2^10 (42<<9)
+  482           =00005600               WIDTH1792         EQU     $00005600       ; 1.11 X 2^10 (43<<9)
+  483           =00005800               WIDTH2048         EQU     $00005800       ; 1.00 X 2^11 (44<<9)
+  484           =00005A00               WIDTH2560         EQU     $00005A00       ; 1.01 X 2^11 (45<<9)
+  485           =00005C00               WIDTH3072         EQU     $00005C00       ; 1.10 X 2^11 (46<<9)
+  486           =00005E00               WIDTH3584         EQU     $00005E00       ; 1.11 X 2^11 (47<<9)
+  487                                   
+  488                                   ; A2 Mask Enable Bit
+  489           =00008000               BLITMASK        EQU     $00008000
+  490                                   
+  491                                   ; X add control d16-d17
+  492                                   ;       controls the update of the X pointer on each pass
+  493                                   ;       round the inner loop
+  494           =00000000               XADDPHR         EQU     $00000000       ; 00 - add phrase width and truncate
+  495           =00010000               XADDPIX         EQU     $00010000       ; 01 - add pixel size (add 1)
+  496           =00020000               XADD0           EQU     $00020000       ; 10 - add zero
+  497           =00030000               XADDINC         EQU     $00030000       ; 11 - add the increment
+  498                                   
+  499                                   ; Y add control d18
+  500                                   ;       controls the update of the Y pointer within the inner loop.
+  501                                   ;       it is overridden by the X add control if they are in add increment
+  502           =00000000               YADD0           EQU     $00000000       ; 00 - add zero
+  503           =00040000               YADD1           EQU     $00040000       ; 01 - add 1
+  504                                   
+
+
+                                        jaguar.inc           Page 11      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  505                                   ; X sign d19
+  506                                   ;       add or subtract pixel size if X add control = 01 (XADDPIX)
+  507           =00000000               XSIGNADD        EQU     $00000000       ; 0 - add pixel size
+  508           =00080000               XSIGNSUB        EQU     $00080000       ; 1 - subtract pixel size
+  509                                   
+  510                                   ; Y sign d20
+  511                                   ;       add or subtract pixel size if Y add control = 01 (YADD1)
+  512           =00000000               YSIGNADD        EQU     $00000000       ; 0 - add 1
+  513           =00100000               YSIGNSUB        EQU     $00100000       ; 1 - sub 1
+  514                                   
+  515                                   
+  516                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  517                                   ;       JERRY REGISTERS
+  518                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  519                                   
+  520           =00F10000               JPIT1           EQU     BASE + $10000   ; Timer 1 Pre-Scaler
+  521           =00F10002               JPIT2           EQU     BASE + $10002   ; Timer 1 Divider
+  522           =00F10004               JPIT3           EQU     BASE + $10004   ; Timer 2 Pre-Scaler
+  523           =00F10006               JPIT4           EQU     BASE + $10006   ; Timer 2 Divider
+  524                                   
+  525           =00F10020               J_INT          EQU     BASE + $10020   ; Jerry Interrupt control (to TOM)
+  526                                   
+  527           =00F14000               JOYSTICK       EQU     BASE + $14000   ; Joystick register and mute
+  528           =00F14000               JOYOUT         EQU     BASE + $14000   ; Joystick register and mute
+  529           =00F14000               JOYIN          EQU     BASE + $14000   ; Joystick register and mute
+  530           =00F14002               JOYBUTS         EQU     BASE + $14002   ; Joystick register
+  531           =00F14002               CONFIG          EQU     BASE + $14002   ; Also has NTSC/PAL
+  532                                   
+  533           =00F1A118               MOD_MASK        EQU     BASE + $1A118   ; Mask for ADDQ(SUBQ)MOD
+  534                                   
+  535           =00F1A150               SCLK            EQU     BASE + $1A150   ; SSI Clock Frequency
+  536           =00F1A154               SMODE           EQU     BASE + $1A154   ; SSI Control
+  537                                   
+  538           =00F1A148               L_I2S           EQU     BASE + $1A148   ; I2S Serial Interface
+  539           =00F1A14C               R_I2S           EQU     BASE + $1A14C   ; I2S Serial Interface
+  540           =00F1A148               LTXD            EQU     BASE + $1A148   ; Synonyms
+  541           =00F1A14C               RTXD            EQU     BASE + $1A14C
+  542           =00F1A148               LRXD            EQU     BASE + $1A148   ; Synonyms
+  543           =00F1A14C               RRXD            EQU     BASE + $1A14C
+  544                                   
+  545           =00F1A148               R_DAC           EQU     BASE + $1A148   ; Swapped on Purpose!
+  546           =00F1A14C               L_DAC           EQU     BASE + $1A14C
+  547                                   
+  548           =00F10034               ASICLK          EQU     BASE + $10034   ; Asynchronous Clock Register
+  549           =00F10032               ASICTRL         EQU     BASE + $10032   ; Asynchronous Control Register
+  550           =00F10032               ASISTAT         EQU     BASE + $10032   ; Asynchronous Status Register
+  551           =00F10030               ASIDATA         EQU     BASE + $10030   ; Asynchronous Data Register
+  552                                   
+  553                                   ;================================================================
+  554                                   ; UART Definitions (new in this file as of 24-Apr-95)
+  555                                   ;================================================================
+  556                                   
+  557                                   ; UART control register Masks
+  558                                   ; All unused bits in the control register need to be written as zeros !
+  559                                   ; With exception of U_CLRERR these are valid for read in ASISTAT, too
+  560                                   
+
+
+                                        jaguar.inc           Page 12      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  561           =00000001               U_MODD          equ     (1<<0)  ; selects odd parity
+  562           =00000002               U_MPAREN        equ     (1<<1)  ; enable parity
+  563           =00000004               U_MTXOPOL       equ     (1<<2)  ; transmit output polarity (if set: active low)
+  564           =00000008               U_MRXIPOL       equ     (1<<3)  ; receive input polarity (if set: invert input)
+  565           =00000010               U_MTINTEN       equ     (1<<4)  ; enable transmitter interrupts
+  566           =00000020               U_MRINTEN       equ     (1<<5)  ; enable reciever interrupts
+  567           =00000040               U_MCLRERR       equ     (1<<6)  ; clear error (only use if U_SERIN is 
+  568                                                                   ; inactive otherwise the UART locks up.
+  569                                                                   ; By default input is active low. This
+  570                                                                   ; depends on U_MRXIPOL) 
+  571           =00004000               U_MTXBRK        equ     (1<<14) ; transmit break
+  572                                   
+  573                                   ; UART control register (ONLY) bit numbers
+  574           =00000006               U_CLRERR        equ     6
+  575                                   
+  576                                   ; UART control AND status register (SHARED) bit numbers 
+  577                                   
+  578           =00000000               U_ODD           equ     0       ; selects odd parity
+  579           =00000001               U_PAREN         equ     1       ; enable parity
+  580           =00000002               U_TXOPOL        equ     2       ; transmit output polarity (if set: active low)
+  581           =00000003               U_RXIPOL        equ     3       ; receive input polarity (if set: invert input)
+  582           =00000004               U_TINTEN        equ     4       ; enable transmitter interrupts
+  583           =00000005               U_RINTEN        equ     5       ; enable reciever interrupts
+  584           =0000000E               U_TXBRK         equ     14      ; transmit break
+  585                                   
+  586                                   ; UART status register (ONLY) bit numbers
+  587                                   
+  588           =0000000F               U_ERR           equ     15      ; error condition exists
+  589           =0000000D               U_SERIN         equ     13      ; state of UART1 Pin (serial input data)
+  590           =0000000B               U_OE            equ     11      ; overrun error
+  591           =0000000A               U_FE            equ     10      ; frame error
+  592           =00000009               U_PE            equ     9       ; parity error
+  593           =00000008               U_TBE           equ     8       ; transitter buffer empty
+  594           =00000007               U_RBF           equ     7       ; receiver buffer full
+  595                                   
+  596                                   ;;;
+  597                                   ;;; Jerry Interrupt Control Flags
+  598                                   ;;;
+  599                                   
+  600           =00000001               J_EXTENA        EQU     $0001           ; Enable external interrupts
+  601           =00000002               J_DSPENA        EQU     $0002           ; Enable DSP interrupts
+  602           =00000004               J_TIM1ENA       EQU     $0004           ; Enable Timer 1 interrupts
+  603           =00000008               J_TIM2ENA       EQU     $0008           ; Enable Timer 2 interrupts
+  604           =00000010               J_ASYNENA       EQU     $0010           ; Enable Asyncronous Serial interrupts
+  605           =00000020               J_SYNENA        EQU     $0020           ; Enable Syncronous Serial interrupts
+  606                                   
+  607           =00000100               J_EXTCLR        EQU     $0100           ; Clear pending external interrupts
+  608           =00000200               J_DSPCLR        EQU     $0200           ; Clear pending DSP interrupts
+  609           =00000400               J_TIM1CLR       EQU     $0400           ; Clear pending Timer 1 interrupts
+  610           =00000800               J_TIM2CLR       EQU     $0800           ; Clear pending Timer 2 interrupts
+  611           =00001000               J_ASYNCLR       EQU     $1000           ; Clear pending Asynch. Serial interrupts
+  612           =00002000               J_SYNCLR        EQU     $2000           ; Clear pending Synch. Serial interrupts
+  613                                   
+  614                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  615                                   ;     JERRY Joystick Equates
+  616                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+                                        jaguar.inc           Page 13      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  617                                   
+  618                                   ; Bits when LONGword is formatted as below (from JOYTEST\JT_LOOP.S).
+  619                                   ;
+  620                                   ; Format: xxApxxBx RLDU147* xxCxxxox 2580369#
+  621                                   
+  622           =00000014               JOY_UP          EQU     20              ;joypad
+  623           =00000015               JOY_DOWN        EQU     21
+  624           =00000016               JOY_LEFT        EQU     22
+  625           =00000017               JOY_RIGHT       EQU     23
+  626                                   
+  627           =0000001D               FIRE_A          EQU     29              ;fire buttons
+  628           =00000019               FIRE_B          EQU     25
+  629           =0000000D               FIRE_C          EQU     13
+  630           =00000009               OPTION          EQU     9
+  631           =0000001C               PAUSE           EQU     28
+  632                                   
+  633           =00000010               KEY_STAR        EQU     16              ;keypad
+  634           =00000011               KEY_7           EQU     17
+  635           =00000012               KEY_4           EQU     18
+  636           =00000013               KEY_1           EQU     19
+  637                                   
+  638           =00000004               KEY_0           EQU     4
+  639           =00000005               KEY_8           EQU     5
+  640           =00000006               KEY_5           EQU     6
+  641           =00000007               KEY_2           EQU     7
+  642                                   
+  643           =00000000               KEY_HASH        EQU     0
+  644           =00000001               KEY_9           EQU     1
+  645           =00000002               KEY_6           EQU     2
+  646           =00000003               KEY_3           EQU     3
+  647                                   
+  648           =00000012               SHIFT_L         EQU     18              ; ProController Mappings
+  649           =00000002               SHIFT_R         EQU     2
+  650           =00000011               FIRE_Z          EQU     17
+  651           =00000005               FIRE_Y          EQU     5
+  652           =00000001               FIRE_X          EQU     1
+  653                                   
+  654           =00F00000               ANY_JOY         EQU     $00F00000       ; AND joyedge with this...
+  655                                                                           ; joypad was pressed if result is not 0
+  656           =32002200               ANY_FIRE        EQU     $32002200       ; AND joyedge with this...
+  657                                                                           ; A,B C, Option or Pause was pressed
+  658                                                                           ; if result is not 0
+  659           =000F00FF               ANY_KEY         EQU     $000F00FF       ; AND joyedge with this... 123456789*0#
+  660                                                                           ; was pressed if result is not 0
+  661                                   
+  662                                   ;;;
+  663                                   ;;;     ROM Tables built into Jerry - 128 samples each
+  664                                   ;;;     16 bit samples sign extended to 32
+  665                                   ;;;
+  666                                   
+  667           =00F1D000               ROM_TABLE       EQU     BASE + $1D000   ; Base of tables
+  668                                   
+  669           =00F1D000               ROM_TRI         EQU     BASE + $1D000   ; A triangle wave
+  670           =00F1D200               ROM_SINE        EQU     BASE + $1D200   ; Full amplitude SINE
+  671           =00F1D400               ROM_AMSINE      EQU     BASE + $1D400   ; Linear (?) ramp SINE
+  672           =00F1D600               ROM_12W         EQU     BASE + $1D600   ; SINE(X)+SINE(2*X) : (was ROM_SINE12W)
+
+
+                                        jaguar.inc           Page 14      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  673           =00F1D800               ROM_CHIRP16     EQU     BASE + $1D800   ; SHORT SWEEP
+  674           =00F1DA00               ROM_NTRI        EQU     BASE + $1DA00   ; Triangle w/NOISE
+  675           =00F1DC00               ROM_DELTA       EQU     BASE + $1DC00   ; Positive spike
+  676           =00F1DE00               ROM_NOISE       EQU     BASE + $1DE00   ; Guess
+  677                                   
+  678                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  679                                   ;       JERRY Registers (DSP)
+  680                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  681                                   
+  682           =00F1A100               D_FLAGS         EQU     BASE + $1A100   ; DSP Flags
+  683           =00F1A104               D_MTXC          EQU     BASE + $1A104   ; DSP Matrix Control
+  684           =00F1A108               D_MTXA          EQU     BASE + $1A108   ; DSP Matrix Address
+  685           =00F1A10C               D_END           EQU     BASE + $1A10C   ; DSP Data Organization
+  686           =00F1A110               D_PC            EQU     BASE + $1A110   ; DSP Program Counter
+  687           =00F1A114               D_CTRL          EQU     BASE + $1A114   ; DSP Operation Control/Status
+  688           =00F1A118               D_MOD          EQU     BASE + $1A118   ; DSP Modulo Instruction Mask
+  689           =00F1A11C               D_REMAIN        EQU     BASE + $1A11C   ; DSP Division Remainder
+  690           =00F1A11C               D_DIVCTRL       EQU     BASE + $1A11C   ; DSP Divider control
+  691           =00F1A120               D_MACHI        EQU     BASE + $1A120   ; DSP Hi byte of MAC operations
+  692           =00F1B000               D_RAM           EQU     BASE + $1B000   ; DSP Internal RAM
+  693           =00F1D000               D_ENDRAM        EQU     D_RAM +(8*1024) ; 8K bytes
+  694                                   
+  695                                   ;;;
+  696                                   ;;; JERRY Flag Register Equates
+  697                                   ;;;
+  698                                   
+  699           =00000010               D_CPUENA        EQU     $00000010       ; CPU Interrupt Enable Bit
+  700           =00000020               D_I2SENA        EQU     $00000020       ; I2S Interrupt Enable Bit
+  701           =00000040               D_TIM1ENA       EQU     $00000040       ; Timer 1 Interrupt Enable Bit
+  702           =00000080               D_TIM2ENA       EQU     $00000080       ; Timer 2 Interrupt Enable Bit
+  703           =00000100               D_EXT0ENA       EQU     $00000100       ; External Interrupt 0 Enable Bit
+  704           =00010000               D_EXT1ENA       EQU     $00010000       ; External Interrupt 1 Enable Bit
+  705                                   
+  706           =00000200               D_CPUCLR        EQU     $00000200       ; CPU Interrupt Clear Bit
+  707           =00000400               D_I2SCLR        EQU     $00000400       ; I2S Interrupt Clear Bit
+  708           =00000800               D_TIM1CLR       EQU     $00000800       ; Timer 1 Interrupt Clear Bit
+  709           =00001000               D_TIM2CLR       EQU     $00001000       ; Timer 2 Interrupt Clear Bit
+  710           =00002000               D_EXT0CLR       EQU     $00002000       ; External Interrupt 0 Clear Bit
+  711           =00020000               D_EXT1CLR       EQU     $00020000       ; External Interrupt 1 Clear Bit
+  712                                   
+  713                                   ;;;
+  714                                   ;;; JERRY Control/Status Register
+  715                                   ;;;
+  716                                   
+  717           =00000001               DSPGO           EQU     $00000001       ; Start DSP
+  718           =00000004               DSPINT0         EQU     $00000004       ; Generate a DSP Interrupt 0
+  719                                   
+  720           =00000040               D_CPULAT        EQU     $00000040       ; Interrupt Latches
+  721           =00000080               D_I2SLAT        EQU     $00000080
+  722           =00000100               D_TIM1LAT       EQU     $00000100
+  723           =00000200               D_TIM2LAT       EQU     $00000200
+  724           =00000400               D_EXT1LAT       EQU     $00000400
+  725           =00010000               D_EXT2LAT       EQU     $00010000
+  726                                   
+  727                                   ;;;
+  728                                   ;;; JERRY Modulo Instruction Masks
+
+
+                                        jaguar.inc           Page 15      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  729                                   ;;;
+  730                                   
+  731           =FFFFFFFE               MODMASK2        EQU     $FFFFFFFE       ; 2 byte circular buffer
+  732           =FFFFFFFC               MODMASK4        EQU     $FFFFFFFC       ; 4 byte circular buffer
+  733           =FFFFFFF8               MODMASK8        EQU     $FFFFFFF8       ; 8 byte circular buffer
+  734           =FFFFFFF0               MODMASK16       EQU     $FFFFFFF0       ; 16 byte circular buffer
+  735           =FFFFFFE0               MODMASK32       EQU     $FFFFFFE0       ; 32 byte circular buffer
+  736           =FFFFFFC0               MODMASK64       EQU     $FFFFFFC0       ; 64 byte circular buffer
+  737           =FFFFFF80               MODMASK128      EQU     $FFFFFF80       ; 128 byte circular buffer
+  738           =FFFFFF00               MODMASK256      EQU     $FFFFFF00       ; 256 byte circular buffer
+  739           =FFFFFE00               MODMASK512      EQU     $FFFFFE00       ; 512 byte circular buffer
+  740           =FFFFFC00               MODMASK1K       EQU     $FFFFFC00       ; 1k circular buffer
+  741           =FFFFF800               MODMASK2K       EQU     $FFFFF800       ; 2k circular buffer
+  742           =FFFFF000               MODMASK4K       EQU     $FFFFF000       ; 4k circular buffer
+  743           =FFFFE000               MODMASK8K       EQU     $FFFFE000       ; 8k circular buffer
+  744           =FFFFC000               MODMASK16K      EQU     $FFFFC000       ; 16k circular buffer
+  745           =FFFF8000               MODMASK32K      EQU     $FFFF8000       ; 32k circular buffer
+  746           =FFFF0000               MODMASK64K      EQU     $FFFF0000       ; 64k circular buffer
+  747           =FFFE0000               MODMASK128K     EQU     $FFFE0000       ; 128k circular buffer
+  748           =FFFC0000               MODMASK256K     EQU     $FFFC0000       ; 256k circular buffer
+  749           =FFF80000               MODMASK512K     EQU     $FFF80000       ; 512k circular buffer
+  750           =FFF00000               MODMASK1M       EQU     $FFF00000       ; 1M circular buffer
+  751                                   
+  752                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  753                                   ;;; SHARED Equates for TOM (GPU) and JERRY (DSP)
+  754                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  755                                   
+  756                                   ;;;
+  757                                   ;;; Control/Status Registers
+  758                                   ;;;
+  759                                   
+  760           =00000001               RISCGO          EQU     $00000001       ; Start GPU or DSP
+  761           =00000002               CPUINT          EQU     $00000002       ; Allow the GPU/DSP to interrupt CPU
+  762           =00000004               FORCEINT0       EQU     $00000004       ; Cause an INT 0 on GPU or DSP
+  763           =00000008               SINGLE_STEP     EQU     $00000008       ; Enter SINGLE_STEP mode
+  764           =00000010               SINGLE_GO       EQU     $00000010       ; Execute one instruction
+  765                                   
+  766           =00004000               REGPAGE         EQU     $00004000       ; Register Bank Select
+  767           =00008000               DMAEN           EQU     $00008000       ; Enable DMA LOAD and STORE
+  768                                   
+  769                                   ;;;
+  770                                   ;;; Flags Register
+  771                                   ;;;
+  772                                   
+  773           =00000001               ZERO_FLAG       EQU     $00000001       ; ALU Zero Flag
+  774           =00000002               CARRY_FLAG      EQU     $00000002       ; ALU Carry Flag
+  775           =00000004               NEGA_FLAG       EQU     $00000004       ; ALU Negative Flag
+  776                                   
+  777           =00000008               IMASK           EQU     $00000008       ; Interrupt Service Mask
+  778                                   
+  779                                   ;;;
+  780                                   ;;; Matrix Control Register
+  781                                   ;;;
+  782                                   
+  783           =00000003               MATRIX3         EQU     $00000003       ; use for 3x1 Matrix
+  784           =00000004               MATRIX4         EQU     $00000004       ; etc...
+
+
+                                        jaguar.inc           Page 16      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  785           =00000005               MATRIX5         EQU     $00000005
+  786           =00000006               MATRIX6         EQU     $00000006
+  787           =00000007               MATRIX7         EQU     $00000007
+  788           =00000008               MATRIX8         EQU     $00000008
+  789           =00000009               MATRIX9         EQU     $00000009
+  790           =0000000A               MATRIX10        EQU     $0000000A
+  791           =0000000B               MATRIX11        EQU     $0000000B
+  792           =0000000C               MATRIX12        EQU     $0000000C
+  793           =0000000D               MATRIX13        EQU     $0000000D
+  794           =0000000E               MATRIX14        EQU     $0000000E
+  795           =0000000F               MATRIX15        EQU     $0000000F
+  796                                   
+  797           =00000000               MATROW          EQU     $00000000       ; Access Matrix by Row
+  798           =00000010               MATCOL          EQU     $00000010       ; Access Matrix by Column
+  799                                   
+  800                                   ;;;
+  801                                   ;;; Data Organisation Register
+  802                                   ;;;
+  803                                   
+  804           =00010001               BIG_IO          EQU     $00010001       ; Use 32-bit registers as big-endian
+  805           =00020002               BIG_PIX         EQU     $00020002       ; Pixel organisation is big-endian
+  806           =00040004               BIG_INST        EQU     $00040004       ; Word program fetches are big-endian
+  807                                   
+  808                                   ;;;
+  809                                   ;;; Divide Unit Control
+  810                                   ;;;
+  811                                   
+  812           =00000001               DIV_OFFSET      EQU     $00000001       ; Divide 16.16 values if set
+  813                                   
+  814                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  815                                   ;;; Atari claimed the below registers should never be messed with and
+  816                                   ;;; eventually removed them from later copies of jaguar.inc. However, there
+  817                                   ;;; are corner cases in which messing with them is necessary (E.g., fixing up
+  818                                   ;;; MEMCON1 to access the Jaguar CD's memory-mapped registers while booting
+  819                                   ;;; from a Skunkboard, programming custom high-resolution video modes, etc.),
+  820                                   ;;; so I've restored them. In general though, the point stands: Don't use
+  821                                   ;;; these if you don't know what you're doing.
+  822                                   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  823                                   
+  824           =00F00000               MEMCON1         EQU     BASE + 0        ; Memory Configuration Register One
+  825           =00F00002               MEMCON2         EQU     BASE + 2        ; Memory Configuration Register Two
+  826           =00F00020               OLPLO           EQU     BASE + $20
+  827           =00F00022               OLPHI           EQU     BASE + $22
+  828           =00F00024               ODP             EQU     BASE + $24      ; Object Data Pointer
+  829           =00F0002E               HP              EQU     BASE + $2e      ; Horizontal Period
+  830           =00F00030               HBB             EQU     BASE + $30      ; Horizontal Blanking Begin
+  831           =00F00032               HBE             EQU     BASE + $32      ; Horizontal Blanking End
+  832           =00F00034               HS              EQU     BASE + $34      ; Horizontal Sync
+  833           =00F00036               HVS             EQU     BASE + $36      ; Horizontal Vertical Sync
+  834           =00F0003E               VP              EQU     BASE + $3e      ; Vertical Period
+  835           =00F00040               VBB             EQU     BASE + $40      ; Vertical Blanking Begin
+  836           =00F00042               VBE             EQU     BASE + $42      ; Vertical Blanking End
+  837           =00F0004A               VEB             EQU     BASE + $4a      ; Vertical EQUalization Begin
+  838           =00F0004C               VEE             EQU     BASE + $4c      ; Vertical EQUalization End
+  839           =00F00054               HEQ             EQU     BASE + $54      ; Horizontal EQUalization End
+  840           =00F00056               TEST1           EQU     BASE + $56      ; Undocumented Register - DO NOT USE
+
+
+                                        jaguar.inc           Page 17      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  841                                   
+  842                                   ;;;;;;;;;
+  843                                   ;; EOF ;;
+  844                                   ;;;;;;;;;
+   57                                       
+   58           =00F03FFC                       gpu_mode EQU (G_RAM+$ffc)   ; Number defines which routine the GPU will do
+   59           =00F03FF8                       gpu_screen EQU (G_RAM+$ff8)   ; The address of the screen the GPU will draw on
+   60           =00F03FF4                       source_flags  EQU (G_RAM+$ff4)
+   61           =00F03FF0                       dest_flags EQU (G_RAM+$ff0)   ; Blitter flags 4 source+dest
+   62           =00F03FEC                       backg  EQU (G_RAM+$fec)
+   63                                       
+   64           =00030000                       p_sines EQU $30000         ; 256-byte sine table of unsigned bytes
+   65           =00F03F60                       in_buf  EQU (G_RAM+$f60)   ; General space for passing stuff to GPU
+   66                                           ORG $f03000
+   67           =00000180                       width EQU 384
+   68           =00000300                       mwidth EQU 768
+   69           =000000F0                       height EQU 240
+   70           =00004000                       diag EQU $4000
+   71                                       
+   72                                         ;***** EQUATES for Blitter offsets
+   73                                       
+   74           =00000000                       _base EQU 0
+   75           =00000001                       _flags EQU 1
+   76           =00000002                       _clip EQU 2
+   77           =00000002                       _mask EQU 2
+   78           =00000003                       _pixel EQU 3
+   79           =00000004                       _step EQU 4
+   80           =00000005                       _fstep EQU 5
+   81           =00000006                       _fpixel EQU 6
+   82           =00000007                       _inc EQU 7
+   83           =00000008                       _finc EQU 8
+   84                                       
+   85                                   ; *******************************************************************
+   86                                   ; sdiv
+   87                                   ; *******************************************************************
+   88                                           MACRO sdiv                 ; Divide, keeping sign of that which is divided, uses r27
+   89                                 .         move \2,r31
+   90                                 .         abs \2
+   91                                 .         div \1,\2
+   92                                 .         btst #31,r31               ; Get sign bit of original thang
+   93                                 .         jr z,\~sdtt
+   94                                 .         nop
+   95                                 .         neg \2
+   96                                 .       \~sdtt:
+   97                                 .         ENDM
+   98                                       
+   99                                   ; *******************************************************************
+  100                                   ; waitblit
+  101                                   ; *******************************************************************
+  102                                           MACRO waitblit             ; Wait for the Blitter to stop
+  103                                 .       \~waitt:
+  104                                 .         load (blit),r31
+  105                                 .         btst #0,r31
+  106                                 .         jr z,\~waitt
+  107                                 .         nop
+  108                                 .         ENDM
+
+
+                                        src/gpu/stoat.gas    Page 18      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  109                                       
+  110                                   ; *******************************************************************
+  111                                   ; fmult
+  112                                   ; *******************************************************************
+  113                                           MACRO fmult                ; multiply 2 thangs, uses r2-r4, returns in first reg.
+  114                                 .         moveta \2,r0               ; (preserves second Thang)
+  115                                 .         moveq #0,r27
+  116                                 .         move r27,r28
+  117                                 .         abs \1
+  118                                 .         addc r28,r27
+  119                                 .         abs \2
+  120                                 .         addc r28,r27
+  121                                 .         move \2,r28
+  122                                 .         mult \1,r28
+  123                                 .         move \1,r29
+  124                                 .         shrq #16,r28
+  125                                 .         shrq #16,r29
+  126                                 .         mult \2,r29
+  127                                 .         shrq #16,\2
+  128                                 .         add r29,r28
+  129                                 .         move \2,r29
+  130                                 .         mult \1,r29
+  131                                 .         shrq #16,\1
+  132                                 .         add r29,r28
+  133                                 .         mult \2,\1
+  134                                 .         shlq #16,\1
+  135                                 .         add r28,\1
+  136                                 .         btst #0,r27
+  137                                 .         jr z,\~fmptt
+  138                                 .         movefa r0,\2
+  139                                 .         neg \1
+  140                                 .       \~fmptt:
+  141                                 .         ENDM
+  142                                       
+  143                                       
+  144                                   ; *******************************************************************
+  145                                   ; fjsr
+  146                                   ; *******************************************************************
+  147                                           MACRO fjsr                 ; Fast single-level JSR
+  148                                 .         move PC,r30
+  149                                 .         jump (\1)
+  150                                 .         addq #6,r30                ; Determine Return Address
+  151                                 .         ENDM
+  152                                       
+  153                                           MACRO frts
+  154                                 .         jump (r30)
+  155                                 .         nop
+  156                                 .         ENDM
+  157                                       
+  158                                           MACRO gjsr                 ; Fast single-level JSR
+  159                                 .         move PC,r31
+  160                                 .         jump (\1)
+  161                                 .         addq #6,r31                ; Determine Return Address
+  162                                 .         ENDM
+  163                                       
+  164                                           MACRO grts
+
+
+                                        src/gpu/stoat.gas    Page 19      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  165                                 .         jump (r31)
+  166                                 .         nop
+  167                                 .         ENDM
+  168                                       
+  169                                   ; *******************************************************************
+  170                                   ; texter
+  171                                   ;
+  172                                   ; Jaguar texter. Input IN_BUF=address of textstring, +4=address of font structure, +8/+12=dropshadow vector X/Y
+  173                                   ; +16/+20=XY scale, +24/+28=XY shear, +32=text origin
+  174                                   ;*
+  175                                   ;* REX: Robotron explosion generator. Takes an image from the source screen and expands it in X and Y, then
+  176                                   ;*  uses a1_n to draw the resultant matrix of single pixels.
+  177                                   ;*
+  178                                   ;*  Provide: dest screen in gpu_screen, in_buf: 0=source image address
+  179                                   ;*  4=source image start pixel address, 8=x and y size of source, 12=X scale (16:16), 16=Y scale (16:16), 20=X shear (16:16), 24=Y shear,
+  180                                   ;*  28=Mode (0=Top edge, 1=Centered), 32=Dest X and Y
+  181                                   ;*
+  182                                   ;*****
+  183                                   ; *******************************************************************
+  184                                   texter:
+  185           =0000000D                       blit     REGEQU r13
+  186           =0000000E                       a1_n     REGEQU r14
+  187           =0000000F                       a2_n     REGEQU r15
+  188                                       
+  189           =00000002                       _bass    REGEQU r2         ; Source base address
+  190           =00000003                       spixel   REGEQU r3         ; Source pixel start
+  191           =00000004                       ssize    REGEQU r4         ; Source rectangle size
+  192           =00000005                       scalex   REGEQU r5
+  193           =00000006                       scaley   REGEQU r6         ; Scaling X and Y
+  194           =00000007                       shearx   REGEQU r7
+  195           =00000008                       sheary   REGEQU r8         ; Shearing X and Y
+  196           =00000009                       mode     REGEQU r9         ; Centering mode
+  197                                       
+  198           =0000000A                       xinc     REGEQU r10
+  199           =0000000B                       yinc     REGEQU r11
+  200           =0000000C                       xstep    REGEQU r12
+  201           =00000010                       ystep    REGEQU r16
+  202           =00000011                       _xstart  REGEQU r17
+  203           =00000012                       ystart   REGEQU r18
+  204           =00000013                       himask   REGEQU r19
+  205           =00000014                       lomask   REGEQU r20
+  206           =00000015                       dstxy    REGEQU r21
+  207           =00000016                       axshear  REGEQU r22
+  208           =00000017                       ayshear  REGEQU r23
+  209                                       
+  210           =00000018                       xx       REGEQU r24
+  211           =00000019                       yy       REGEQU r25
+  212           =0000001A                       x_add    REGEQU r26
+  213           =0000001D                       textptr  REGEQU r29
+  214           =0000001E                       fontbase REGEQU r30
+  215                                       
+  216           =00000002                       dropx    REGEQU r2
+  217           =00000003                       dropy    REGEQU r3
+  218                                       
+  219                                   rex:
+  220  00000000  980E220000F0                   movei #A1_BASE,a1_n
+
+
+                                        src/gpu/stoat.gas    Page 20      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  221  00000006  980F222400F0                   movei #A2_BASE,a2_n        ; initialise the usual stuff
+  222  0000000C  980D223800F0                   movei #B_CMD,blit
+  223  00000012  2C00                           xor r0,r0
+  224  00000014  9801226800F0                   movei #B_PATD,r1
+  225  0000001A  BC20                           store r0,(r1)
+  226  0000001C  0881                           addq #4,r1
+  227  0000001E  BC20                           store r0,(r1)
+  228                                       
+  229  00000020  98003F6000F0                   movei #in_buf,r0           ; load the parameters into registers
+  230  00000026  A41D                           load (r0),textptr          ; point at start of textstring
+  231  00000028  0880                           addq #4,r0
+  232  0000002A  A41E                           load (r0),fontbase         ; point to start of font datastructure
+  233  0000002C  0880                           addq #4,r0
+  234  0000002E  A402                           load (r0),dropx
+  235  00000030  0880                           addq #4,r0
+  236  00000032  A403                           load (r0),dropy
+  237  00000034  0880                           addq #4,r0
+  238  00000036  9042                           moveta dropx,dropx
+  239  00000038  9063                           moveta dropy,dropy
+  240  0000003A  A405                           load (r0),scalex
+  241  0000003C  0880                           addq #4,r0
+  242  0000003E  A406                           load (r0),scaley
+  243  00000040  0880                           addq #4,r0                 ; get text expansion x/y
+  244  00000042  A407                           load (r0),shearx
+  245  00000044  0880                           addq #4,r0
+  246  00000046  A408                           load (r0),sheary
+  247  00000048  0880                           addq #4,r0                 ; get XY shear
+  248  0000004A  A415                           load (r0),dstxy            ; get dest XY position
+  249  0000004C  0880                           addq #4,r0
+  250  0000004E  A409                           load (r0),mode             ; Mode: 0=straight draw, 1=drop shadow
+  251  00000050  93A6                           moveta textptr,r6
+  252  00000052  92A7                           moveta dstxy,r7
+  253                                       
+  254  00000054  A7C2                           load (fontbase),_bass
+  255  00000056  089E                           addq #4,fontbase           ; got base page address
+  256  00000058  A7C4                           load (fontbase),ssize      ; got the source size..
+  257  0000005A  089E                           addq #4,fontbase           ; now fontbase is really the fontbase
+  258                                       
+  259  0000005C  98130000FFFF                   movei #$ffff0000,himask
+  260  00000062  9814FFFF0000                   movei #$ffff,lomask
+  261                                       
+  262  00000068  889A                           move ssize,x_add
+  263  0000006A  621A                           shlq #16,x_add
+                                                fmult x_add,scalex
+       0000006C  90A0                 @         moveta scalex,r0               
+       0000006E  8C1B                 @         moveq #0,r27
+       00000070  8B7C                 @         move r27,r28
+       00000072  581A                 @         abs x_add
+       00000074  079B                 @         addc r28,r27
+       00000076  5805                 @         abs scalex
+       00000078  079B                 @         addc r28,r27
+       0000007A  88BC                 @         move scalex,r28
+       0000007C  435C                 @         mult x_add,r28
+       0000007E  8B5D                 @         move x_add,r29
+       00000080  661C                 @         shrq #16,r28
+       00000082  661D                 @         shrq #16,r29
+
+
+                                        src/gpu/stoat.gas    Page 21      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+       00000084  40BD                 @         mult scalex,r29
+       00000086  6605                 @         shrq #16,scalex
+       00000088  03BC                 @         add r29,r28
+       0000008A  88BD                 @         move scalex,r29
+       0000008C  435D                 @         mult x_add,r29
+       0000008E  661A                 @         shrq #16,x_add
+       00000090  03BC                 @         add r29,r28
+       00000092  40BA                 @         mult scalex,x_add
+       00000094  621A                 @         shlq #16,x_add
+       00000096  039A                 @         add r28,x_add
+       00000098  341B                 @         btst #0,r27
+       0000009A  xxxx                 @         jr z,M0fmptt
+       0000009C  9405                 @         movefa r0,scalex
+       0000009E  201A                 @         neg x_add
+  264                                 @       M0fmptt:
+  265  000000A0  661A                           shrq #16,x_add
+  266                                         ;  and lomask,x_add    ;get X size alone
+  267  000000A2  085A                           addq #2,x_add              ; make intra-character spacing
+  268  000000A4  94DD                           movefa r6,textptr          ; FMULT mashed it
+  269  000000A6  90A5                           moveta scalex,scalex
+  270  000000A8  9108                           moveta sheary,sheary       ; these are modified in the charprint loop
+  271                                       
+  272                                   textloop:
+  273  000000AA  9FA0                           loadb (textptr),r0
+  274  000000AC  9801xxxxxxxx                   movei #ntxt,r1
+  275  000000B2  083D                           addq #1,textptr            ; get char
+  276  000000B4  7C00                           cmpq #0,r0                 ; is it zero?
+  277  000000B6  D022                           jump eq,(r1)               ; stop if char 0 was encountered
+  278  000000B8  E400                           nop
+  279  000000BA  1800                           subq #32,r0                ; ASCII 0-31 do NOT print
+  280  000000BC  63C0                           shlq #2,r0
+  281  000000BE  03C0                           add fontbase,r0            ; make r0 point to character index
+  282  000000C0  A403                           load (r0),spixel           ; source-pixel is set
+  283                                       
+  284  000000C2  93BD                           moveta textptr,textptr
+  285  000000C4  93DE                           moveta fontbase,fontbase   ; these will be bashed when the char is printed
+  286                                       
+  287                                       
+  288  000000C6  88B1                           move scalex,_xstart
+  289  000000C8  8880                           move ssize,r0
+  290  000000CA  88D2                           move scaley,ystart
+  291  000000CC  8881                           move ssize,r1
+  292  000000CE  6200                           shlq #16,r0                ; got X size
+  293  000000D0  2661                           and himask,r1              ; and Y size as 16:16
+                                                fmult _xstart,r0
+       000000D2  9000                 @         moveta r0,r0               
+       000000D4  8C1B                 @         moveq #0,r27
+       000000D6  8B7C                 @         move r27,r28
+       000000D8  5811                 @         abs _xstart
+       000000DA  079B                 @         addc r28,r27
+       000000DC  5800                 @         abs r0
+       000000DE  079B                 @         addc r28,r27
+       000000E0  881C                 @         move r0,r28
+       000000E2  423C                 @         mult _xstart,r28
+       000000E4  8A3D                 @         move _xstart,r29
+       000000E6  661C                 @         shrq #16,r28
+
+
+                                        src/gpu/stoat.gas    Page 22      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+       000000E8  661D                 @         shrq #16,r29
+       000000EA  401D                 @         mult r0,r29
+       000000EC  6600                 @         shrq #16,r0
+       000000EE  03BC                 @         add r29,r28
+       000000F0  881D                 @         move r0,r29
+       000000F2  423D                 @         mult _xstart,r29
+       000000F4  6611                 @         shrq #16,_xstart
+       000000F6  03BC                 @         add r29,r28
+       000000F8  4011                 @         mult r0,_xstart
+       000000FA  6211                 @         shlq #16,_xstart
+       000000FC  0391                 @         add r28,_xstart
+       000000FE  341B                 @         btst #0,r27
+       00000100  xxxx                 @         jr z,M1fmptt
+       00000102  9400                 @         movefa r0,r0
+       00000104  2011                 @         neg _xstart
+  294                                 @       M1fmptt:
+                                                fmult ystart,r1            ; got (width*scalex) and (height*scaley)
+       00000106  9020                 @         moveta r1,r0               
+       00000108  8C1B                 @         moveq #0,r27
+       0000010A  8B7C                 @         move r27,r28
+       0000010C  5812                 @         abs ystart
+       0000010E  079B                 @         addc r28,r27
+       00000110  5801                 @         abs r1
+       00000112  079B                 @         addc r28,r27
+       00000114  883C                 @         move r1,r28
+       00000116  425C                 @         mult ystart,r28
+       00000118  8A5D                 @         move ystart,r29
+       0000011A  661C                 @         shrq #16,r28
+       0000011C  661D                 @         shrq #16,r29
+       0000011E  403D                 @         mult r1,r29
+       00000120  6601                 @         shrq #16,r1
+       00000122  03BC                 @         add r29,r28
+       00000124  883D                 @         move r1,r29
+       00000126  425D                 @         mult ystart,r29
+       00000128  6612                 @         shrq #16,ystart
+       0000012A  03BC                 @         add r29,r28
+       0000012C  4032                 @         mult r1,ystart
+       0000012E  6212                 @         shlq #16,ystart
+       00000130  0392                 @         add r28,ystart
+       00000132  341B                 @         btst #0,r27
+       00000134  xxxx                 @         jr z,M2fmptt
+       00000136  9401                 @         movefa r0,r1
+       00000138  2012                 @         neg ystart
+  295                                 @       M2fmptt:
+  296                                       
+  297                                       
+  298  0000013A  88F6                           move shearx,axshear
+  299  0000013C  8917                           move sheary,ayshear
+                                                fmult axshear,r1           ; height*xshear
+       0000013E  9020                 @         moveta r1,r0               
+       00000140  8C1B                 @         moveq #0,r27
+       00000142  8B7C                 @         move r27,r28
+       00000144  5816                 @         abs axshear
+       00000146  079B                 @         addc r28,r27
+       00000148  5801                 @         abs r1
+       0000014A  079B                 @         addc r28,r27
+
+
+                                        src/gpu/stoat.gas    Page 23      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+       0000014C  883C                 @         move r1,r28
+       0000014E  42DC                 @         mult axshear,r28
+       00000150  8ADD                 @         move axshear,r29
+       00000152  661C                 @         shrq #16,r28
+       00000154  661D                 @         shrq #16,r29
+       00000156  403D                 @         mult r1,r29
+       00000158  6601                 @         shrq #16,r1
+       0000015A  03BC                 @         add r29,r28
+       0000015C  883D                 @         move r1,r29
+       0000015E  42DD                 @         mult axshear,r29
+       00000160  6616                 @         shrq #16,axshear
+       00000162  03BC                 @         add r29,r28
+       00000164  4036                 @         mult r1,axshear
+       00000166  6216                 @         shlq #16,axshear
+       00000168  0396                 @         add r28,axshear
+       0000016A  341B                 @         btst #0,r27
+       0000016C  xxxx                 @         jr z,M3fmptt
+       0000016E  9401                 @         movefa r0,r1
+       00000170  2016                 @         neg axshear
+  300                                 @       M3fmptt:
+                                                fmult ayshear,r0           ; width*yshear
+       00000172  9000                 @         moveta r0,r0               
+       00000174  8C1B                 @         moveq #0,r27
+       00000176  8B7C                 @         move r27,r28
+       00000178  5817                 @         abs ayshear
+       0000017A  079B                 @         addc r28,r27
+       0000017C  5800                 @         abs r0
+       0000017E  079B                 @         addc r28,r27
+       00000180  881C                 @         move r0,r28
+       00000182  42FC                 @         mult ayshear,r28
+       00000184  8AFD                 @         move ayshear,r29
+       00000186  661C                 @         shrq #16,r28
+       00000188  661D                 @         shrq #16,r29
+       0000018A  401D                 @         mult r0,r29
+       0000018C  6600                 @         shrq #16,r0
+       0000018E  03BC                 @         add r29,r28
+       00000190  881D                 @         move r0,r29
+       00000192  42FD                 @         mult ayshear,r29
+       00000194  6617                 @         shrq #16,ayshear
+       00000196  03BC                 @         add r29,r28
+       00000198  4017                 @         mult r0,ayshear
+       0000019A  6217                 @         shlq #16,ayshear
+       0000019C  0397                 @         add r28,ayshear
+       0000019E  341B                 @         btst #0,r27
+       000001A0  xxxx                 @         jr z,M4fmptt
+       000001A2  9400                 @         movefa r0,r0
+       000001A4  2017                 @         neg ayshear
+  301                                 @       M4fmptt:
+  302                                       
+  303  000001A6  8A38                           move _xstart,xx            ; Calculation for CENTERED explosion
+  304  000001A8  8A59                           move ystart,yy
+  305  000001AA  02D8                           add axshear,xx
+  306  000001AC  02F9                           add ayshear,yy
+  307  000001AE  6C38                           sharq #1,xx
+  308  000001B0  6C39                           sharq #1,yy                ; XX and YY are vector to start pixel for dest blit
+  309                                       
+
+
+                                        src/gpu/stoat.gas    Page 24      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  310  000001B2  8AA0                           move dstxy,r0
+  311  000001B4  8AA1                           move dstxy,r1
+  312  000001B6  6200                           shlq #16,r0
+  313  000001B8  2661                           and himask,r1              ; dest X and Y converted to 16:16 frax
+  314  000001BA  1300                           sub xx,r0
+  315  000001BC  1321                           sub yy,r1                  ; r0 has x pixel+frac, r1 has y
+  316                                       
+  317                                       
+  318  000001BE  981Exxxxxxxx                   movei #pasthack,r30
+  319  000001C4  7C00                           cmpq #0,r0                 ; check for bug condition (LH sprite edge off the screen)
+  320  000001C6  E400                           nop
+  321  000001C8  E400                           nop
+  322  000001CA  D3D4                           jump pl,(r30)
+  323  000001CC  E400                           nop
+  324  000001CE  E400                           nop
+  325                                   shrnk:
+  326  000001D0  1824                           subq #1,ssize              ; shrink until pixel's on screen
+  327  000001D2  0823                           addq #1,spixel
+  328  000001D4  10B1                           sub scalex,_xstart
+  329  000001D6  00A0                           add scalex,r0
+  330  000001D8  E400                           nop
+  331  000001DA  E400                           nop
+  332  000001DC  D738                           jr mi,shrnk
+  333  000001DE  E400                           nop
+  334  000001E0  E400                           nop
+  335  000001E2  981Cxxxxxxxx                   movei #StopGPU,r28
+  336  000001E8  889B                           move ssize,r27
+  337  000001EA  621B                           shlq #16,r27
+  338  000001EC  E400                           nop
+  339  000001EE  D398                           jump mi,(r28)
+  340  000001F0  E400                           nop
+  341  000001F2  267B                           and himask,r27
+  342  000001F4  E400                           nop
+  343  000001F6  D382                           jump eq,(r28)
+  344  000001F8  E400                           nop
+  345                                       
+  346                                   pasthack:
+  347  000001FA  7C29                           cmpq #1,mode
+  348  000001FC  xxxx                           jr ne,nods1
+  349  000001FE  E400                           nop
+  350  00000200  945F                           movefa dropx,r31
+  351  00000202  947E                           movefa dropy,r30
+  352  00000204  03E0                           add r31,r0
+  353  00000206  03C1                           add r30,r1                 ; do dropshadow positioning
+  354                                       
+  355                                   nods1:
+  356  00000208  8818                           move r0,xx
+  357  0000020A  8819                           move r0,yy
+  358  0000020C  6618                           shrq #16,xx
+  359  0000020E  2699                           and lomask,yy              ; X integer parts to xx and fractional to yy
+  360  00000210  8820                           move r1,r0
+  361  00000212  6201                           shlq #16,r1
+  362  00000214  2660                           and himask,r0
+  363  00000216  2839                           or r1,yy
+  364  00000218  2818                           or r0,xx                   ; XX and YY now have a1_pixel and a1_pixelf values
+  365                                       
+
+
+                                        src/gpu/stoat.gas    Page 25      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  366  0000021A  8A2C                           move _xstart,xstep
+  367  0000021C  8AF0                           move ayshear,ystep
+  368  0000021E  200C                           neg xstep
+  369  00000220  2010                           neg ystep
+  370  00000222  00EC                           add shearx,xstep           ; x step is -(width*scale)-shearx
+  371  00000224  00D0                           add scaley,ystep           ; y step is -(width*yshear)+scaley
+  372                                       
+  373  00000226  8980                           move xstep,r0
+  374  00000228  8981                           move xstep,r1
+  375  0000022A  6600                           shrq #16,r0
+  376  0000022C  2681                           and lomask,r1              ; x components set up
+  377                                       
+  378  0000022E  8A0C                           move ystep,xstep
+  379  00000230  6210                           shlq #16,ystep
+  380  00000232  266C                           and himask,xstep
+  381  00000234  2A01                           or ystep,r1
+  382  00000236  2980                           or xstep,r0                ; r0/r1 have a1_step and a1_fstep
+  383                                       
+  384  00000238  88AA                           move scalex,xinc
+  385  0000023A  88AB                           move scalex,yinc
+  386  0000023C  660A                           shrq #16,xinc
+  387  0000023E  268B                           and lomask,yinc
+  388  00000240  8905                           move sheary,scalex
+  389  00000242  6208                           shlq #16,sheary
+  390  00000244  2665                           and himask,scalex
+  391  00000246  290B                           or sheary,yinc
+  392  00000248  28AA                           or scalex,xinc             ; xinc/yinc have a1_inc and a1_finc
+  393                                       
+                                                waitblit
+                                      @       M5waitt:
+       0000024A  A5BF                 @         load (blit),r31
+       0000024C  341F                 @         btst #0,r31
+       0000024E  D7A2                 @         jr z,M5waitt
+  394  00000250  E400                 @         nop
+  395                                       
+  396  00000252  C478                           store xx,(a1_n+_pixel)
+  397  00000254  C4D9                           store yy,(a1_n+_fpixel)
+  398  00000256  C480                           store r0,(a1_n+_step)
+  399  00000258  C4A1                           store r1,(a1_n+_fstep)
+  400  0000025A  C4EA                           store xinc,(a1_n+_inc)
+  401  0000025C  C50B                           store yinc,(a1_n+_finc)
+  402  0000025E  98003FF800F0                   movei #gpu_screen,r0
+  403  00000264  980144200003                   movei #(PITCH1|PIXEL16|WID384|XADDINC),r1
+  404  0000026A  A41F                           load (r0),r31
+  405  0000026C  C421                           store r1,(a1_n+_flags)
+  406  0000026E  980101800118                   movei #$1180180,r1
+  407  00000274  BDDF                           store r31,(a1_n)           ; a1_n is now set up...
+  408  00000276  C441                           store r1,(a1_n+_clip)
+  409                                       
+  410                                       
+  411  00000278  BDE2                           store _bass,(a2_n)
+  412  0000027A  C863                           store spixel,(a2_n+_pixel)
+  413  0000027C  8880                           move ssize,r0
+  414  0000027E  2680                           and lomask,r0              ; get width
+  415  00000280  2000                           neg r0
+  416  00000282  2680                           and lomask,r0
+
+
+                                        src/gpu/stoat.gas    Page 26      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  417  00000284  3A00                           bset #16,r0                ; step is (-xsize,1)
+  418  00000286  980142200001                   movei #(PITCH1|PIXEL16|WID320|XADDPIX),r1
+  419  0000028C  C880                           store r0,(a2_n+_step)
+  420  0000028E  C821                           store r1,(a2_n+_flags)
+  421                                       
+  422  00000290  9800223C00F0                   movei #B_COUNT,r0
+  423  00000296  BC04                           store ssize,(r0)           ; count is destination size
+  424                                       
+  425  00000298  9800F00000FF                   movei #$fff000,r0
+  426  0000029E  9801227000F0                   movei #B_IINC,r1
+  427  000002A4  BC20                           store r0,(r1)              ; i-register used in shadowing
+  428                                       
+  429  000002A6  980007410980                   movei #(SRCEN|CLIP_A1|UPDA1F|UPDA1|UPDA2|LFU_A|LFU_AN|DCOMPEN),r0
+  430  000002AC  980107414840                   movei #(SRCEN|CLIP_A1|UPDA1F|UPDA1|UPDA2|LFU_NA|DCOMPEN|SRCSHADE),r1
+  431                                         ;  movei #(SRCEN|CLIP_A1|UPDA1F|UPDA1|UPDA2|LFU_A|LFU_AN),r0
+  432  000002B2  7C29                           cmpq #1,mode
+  433  000002B4  xxxx                           jr ne,nods                 ; check for drop shadow
+  434  000002B6  E400                           nop
+  435  000002B8  8820                           move r1,r0                 ; extra blitter flags if ds selected
+  436                                       
+  437                                   nods:
+  438  000002BA  BDA0                           store r0,(blit)            ; draw the sprite
+  439                                       
+  440  000002BC  97BD                           movefa textptr,textptr
+  441  000002BE  97DE                           movefa fontbase,fontbase
+  442  000002C0  94A5                           movefa scalex,scalex
+  443  000002C2  9508                           movefa sheary,sheary
+  444  000002C4  0355                           add x_add,dstxy            ; restore pointers and move over one character space
+  445                                       
+  446                                       
+  447                                       
+  448  000002C6  980030AA00F0                   movei #textloop,r0
+  449  000002CC  D000                           jump (r0)
+  450  000002CE  E400                           nop                        ; loop back until zero character
+  451                                       
+  452                                   ntxt:
+  453  000002D0  7C29                           cmpq #1,mode
+  454  000002D2  xxxx                           jr ne,StopGPU
+  455  000002D4  E400                           nop
+  456  000002D6  8C09                           moveq #0,mode
+  457  000002D8  980030AA00F0                   movei #textloop,r0
+  458  000002DE  94DD                           movefa r6,textptr
+  459  000002E0  94F5                           movefa r7,dstxy
+  460  000002E2  D000                           jump (r0)
+  461  000002E4  E400                           nop
+  462                                       
+  463                                       
+  464                                   StopGPU:
+  465  000002E6  9801211400F0                   movei #G_CTRL,r1           ; point at GPU flags
+  466  000002EC  A420                           load (r1),r0
+  467  000002EE  3C00                           bclr #0,r0
+  468  000002F0  BC20                           store r0,(r1)              ; stop the GPU
+  469                                   stoploop:
+  470  000002F2  D7E0                           jr stoploop
+  471                                       
+  472                                       
+
+
+                                                             Page 27      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+
+
+  473                                   ; vim:ft=asm68k ts=2
+
+
+                                        src/gpu/stoat.gas    Page 28      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+Symbol Table
+
+           A1_BASE 0000000000F02200  a         BLIT_SRCZ2 0000000000F02260  a           D_CPUCLR 0000000000000200  a          G_BLITENA 0000000000000100  a 
+           A1_CLIP 0000000000F02208  a          BLIT_STOP 0000000000F02278  a           D_CPUENA 0000000000000010  a          G_BLITLAT 0000000000000400  a 
+           A1_FINC 0000000000F02220  a          BLIT_ZINC 0000000000F02274  a           D_CPULAT 0000000000000040  a           G_CPUCLR 0000000000000200  a 
+          A1_FLAGS 0000000000F02204  a              BORD1 0000000000F0002A  a             D_CTRL 0000000000F1A114  a           G_CPUENA 0000000000000010  a 
+         A1_FPIXEL 0000000000F02218  a              BORD2 0000000000F0002C  a          D_DIVCTRL 0000000000F1A11C  a           G_CPULAT 0000000000000040  a 
+          A1_FSTEP 0000000000F02214  a          BRANCHOBJ 0000000000000003  a              D_END 0000000000F1A10C  a             G_CTRL 0000000000F02114  a 
+            A1_INC 0000000000F0221C  a              BUSHI 0000000020000000  a           D_ENDRAM 0000000000F1D000  a          G_DIVCTRL 0000000000F0211C  a 
+          A1_PIXEL 0000000000F0220C  a              B_CMD 0000000000F02238  a          D_EXT0CLR 0000000000002000  a           G_DSPCLR 0000000000000400  a 
+           A1_STEP 0000000000F02210  a            B_COUNT 0000000000F0223C  a          D_EXT0ENA 0000000000000100  a           G_DSPENA 0000000000000020  a 
+            A2MASK 0000000000F0222C  a             B_DSTD 0000000000F02248  a          D_EXT1CLR 0000000000020000  a           G_DSPLAT 0000000000000080  a 
+           A2_BASE 0000000000F02224  a             B_DSTZ 0000000000F02250  a          D_EXT1ENA 0000000000010000  a              G_END 0000000000F0210C  a 
+          A2_FLAGS 0000000000F02228  a               B_I0 0000000000F02288  a          D_EXT1LAT 0000000000000400  a           G_ENDRAM 0000000000F04000  a 
+           A2_MASK 000000000000C000  a               B_I1 0000000000F02284  a          D_EXT2LAT 0000000000010000  a            G_FLAGS 0000000000F02100  a 
+          A2_PIXEL 0000000000F02230  a               B_I2 0000000000F02280  a            D_FLAGS 0000000000F1A100  a           G_HIDATA 0000000000F02118  a 
+           A2_STEP 0000000000F02234  a               B_I3 0000000000F0227C  a           D_I2SCLR 0000000000000400  a             G_MTXA 0000000000F02108  a 
+           ADDDSEL 0000000000020000  a             B_IINC 0000000000F02270  a           D_I2SENA 0000000000000020  a             G_MTXC 0000000000F02104  a 
+          ANY_FIRE 0000000032002200  a             B_PATD 0000000000F02268  a           D_I2SLAT 0000000000000080  a            G_OPCLR 0000000000001000  a 
+           ANY_JOY 0000000000F00000  a             B_SRCD 0000000000F02240  a            D_MACHI 0000000000F1A120  a            G_OPENA 0000000000000080  a 
+           ANY_KEY 00000000000F00FF  a            B_SRCZ1 0000000000F02258  a              D_MOD 0000000000F1A118  a            G_OPLAT 0000000000000200  a 
+            ASICLK 0000000000F10034  a            B_SRCZ2 0000000000F02260  a             D_MTXA 0000000000F1A108  a               G_PC 0000000000F02110  a 
+           ASICTRL 0000000000F10032  a             B_STOP 0000000000F02278  a             D_MTXC 0000000000F1A104  a           G_PITCLR 0000000000000800  a 
+           ASIDATA 0000000000F10030  a               B_Z0 0000000000F02298  a               D_PC 0000000000F1A110  a           G_PITENA 0000000000000040  a 
+           ASISTAT 0000000000F10032  a               B_Z1 0000000000F02294  a              D_RAM 0000000000F1B000  a           G_PITLAT 0000000000000100  a 
+              BASE 0000000000F00000  a               B_Z2 0000000000F02290  a           D_REMAIN 0000000000F1A11C  a              G_RAM 0000000000F03000  a 
+           BCOMPEN 0000000004000000  a               B_Z3 0000000000F0228C  a          D_TIM1CLR 0000000000000800  a           G_REMAIN 0000000000F0211C  a 
+                BG 0000000000F00058  a             B_ZINC 0000000000F02274  a          D_TIM1ENA 0000000000000040  a                HBB 0000000000F00030  a 
+              BGEN 0000000000000080  a               Base 0000000000F00000  a          D_TIM1LAT 0000000000000100  a                HBE 0000000000F00032  a 
+          BIG_INST 0000000000040004  a         CARRY_FLAG 0000000000000002  a          D_TIM2CLR 0000000000001000  a                 HC 0000000000F00004  a 
+            BIG_IO 0000000000010001  a            CLIP_A1 0000000000000040  a          D_TIM2ENA 0000000000000080  a               HDB1 0000000000F00038  a 
+           BIG_PIX 0000000000020002  a               CLUT 0000000000F00400  a          D_TIM2LAT 0000000000000200  a               HDB2 0000000000F0003A  a 
+              BINC 0000000000000020  a             CMPDST 0000000002000000  a             ENDRAM 0000000000200000  a                HDE 0000000000F0003C  a 
+            BITOBJ 0000000000000000  a             CONFIG 0000000000F14002  a             FIRE_A 000000000000001D  a                HEQ 0000000000F00054  a 
+           BKGWREN 0000000010000000  a             CPUINT 0000000000000002  a             FIRE_B 0000000000000019  a                 HP 0000000000F0002E  a 
+          BLITMASK 0000000000008000  a              CRY16 0000000000000000  a             FIRE_C 000000000000000D  a                 HS 0000000000F00034  a 
+       BLIT_A1BASE 0000000000F02200  a              CSYNC 0000000000000040  a             FIRE_X 0000000000000001  a                HVS 0000000000F00036  a 
+       BLIT_A1CLIP 0000000000F02208  a           C_GPUCLR 0000000000000200  a             FIRE_Y 0000000000000005  a              IMASK 0000000000000008  a 
+      BLIT_A1FLAGS 0000000000F02204  a           C_GPUENA 0000000000000002  a             FIRE_Z 0000000000000011  a              INCEN 0000000000000010  a 
+      BLIT_A1FSTEP 0000000000F02214  a           C_JERCLR 0000000000001000  a          FORCEINT0 0000000000000004  a          INITSTACK 00000000001FFFFC  a 
+        BLIT_A1INC 0000000000F0221C  a           C_JERENA 0000000000000010  a            GENLOCK 0000000000000008  a               INT1 0000000000F000E0  a 
+       BLIT_A1INCF 0000000000F02220  a            C_OPCLR 0000000000000400  a              GOURD 0000000000001000  a               INT2 0000000000F000E2  a 
+      BLIT_A1PIXEL 0000000000F0220C  a            C_OPENA 0000000000000004  a            GPUCTRL 0000000000F02114  a            JOYBUTS 0000000000F14002  a 
+     BLIT_A1PIXELF 0000000000F02218  a           C_PITCLR 0000000000000800  a              GPUGO 0000000000000001  a              JOYIN 0000000000F14000  a 
+       BLIT_A1STEP 0000000000F02210  a           C_PITENA 0000000000000008  a            GPUINT0 0000000000000004  a             JOYOUT 0000000000F14000  a 
+       BLIT_A2BASE 0000000000F02224  a           C_VIDCLR 0000000000000100  a             GPUOBJ 0000000000000002  a           JOYSTICK 0000000000F14000  a 
+      BLIT_A2FLAGS 0000000000F02228  a           C_VIDENA 0000000000000001  a           GPU_CTRL 0000000000F02114  a           JOY_DOWN 0000000000000015  a 
+       BLIT_A2MASK 0000000000F0222C  a            DCOMPEN 0000000008000000  a        GPU_DIVCTRL 0000000000F0211C  a           JOY_LEFT 0000000000000016  a 
+      BLIT_A2PIXEL 0000000000F02230  a           DIRECT16 0000000000000004  a            GPU_END 0000000000F0210C  a          JOY_RIGHT 0000000000000017  a 
+       BLIT_A2STEP 0000000000F02234  a         DIV_OFFSET 0000000000000001  a         GPU_ENDRAM 0000000000F04000  a             JOY_UP 0000000000000014  a 
+          BLIT_CMD 0000000000F02238  a              DMAEN 0000000000008000  a          GPU_FLAGS 0000000000F02100  a              JPIT1 0000000000F10000  a 
+        BLIT_COUNT 0000000000F0223C  a               DRAM 0000000000000000  a         GPU_HIDATA 0000000000F02118  a              JPIT2 0000000000F10002  a 
+         BLIT_DSTD 0000000000F02248  a              DSPGO 0000000000000001  a           GPU_MTXA 0000000000F02108  a              JPIT3 0000000000F10004  a 
+         BLIT_DSTZ 0000000000F02250  a            DSPINT0 0000000000000004  a           GPU_MTXC 0000000000F02104  a              JPIT4 0000000000F10006  a 
+         BLIT_IINC 0000000000F02270  a              DSTA2 0000000000000800  a             GPU_PC 0000000000F02110  a          J_ASYNCLR 0000000000001000  a 
+         BLIT_PATD 0000000000F02268  a              DSTEN 0000000000000008  a            GPU_RAM 0000000000F03000  a          J_ASYNENA 0000000000000010  a 
+         BLIT_SRCD 0000000000F02240  a             DSTENZ 0000000000000010  a         GPU_REMAIN 0000000000F0211C  a           J_DSPCLR 0000000000000200  a 
+        BLIT_SRCZ1 0000000000F02258  a             DSTWRZ 0000000000000020  a          G_BLITCLR 0000000000002000  a           J_DSPENA 0000000000000002  a 
+
+
+                                        src/gpu/stoat.gas    Page 29      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+Symbol Table
+
+          J_EXTCLR 0000000000000100  a            M2fmptt 0000000000F0313A  a             OPTION 0000000000000009  a        ROM_CHIRP16 0000000000F1D800  a 
+          J_EXTENA 0000000000000001  a            M3fmptt 0000000000F03172  a             O_1GAP 0000000000010000  a          ROM_DELTA 0000000000F1DC00  a 
+             J_INT 0000000000F10020  a            M4fmptt 0000000000F031A6  a             O_2GAP 0000000000018000  a          ROM_NOISE 0000000000F1DE00  a 
+          J_SYNCLR 0000000000002000  a            M5waitt 0000000000F0324A  a             O_3GAP 0000000000020000  a           ROM_NTRI 0000000000F1DA00  a 
+          J_SYNENA 0000000000000020  a             MATCOL 0000000000000010  a             O_4GAP 0000000000028000  a           ROM_SINE 0000000000F1D200  a 
+         J_TIM1CLR 0000000000000400  a           MATRIX10 000000000000000A  a             O_5GAP 0000000000030000  a          ROM_TABLE 0000000000F1D000  a 
+         J_TIM1ENA 0000000000000004  a           MATRIX11 000000000000000B  a             O_6GAP 0000000000038000  a            ROM_TRI 0000000000F1D000  a 
+         J_TIM2CLR 0000000000000800  a           MATRIX12 000000000000000C  a             O_BREQ 0000000000000000  a               RRXD 0000000000F1A14C  a 
+         J_TIM2ENA 0000000000000008  a           MATRIX13 000000000000000D  a             O_BRGT 0000000000004000  a               RTXD 0000000000F1A14C  a 
+             KEY_0 0000000000000004  a           MATRIX14 000000000000000E  a           O_BRHALF 0000000000010000  a              R_DAC 0000000000F1A148  a 
+             KEY_1 0000000000000013  a           MATRIX15 000000000000000F  a             O_BRLT 0000000000008000  a              R_I2S 0000000000F1A14C  a 
+             KEY_2 0000000000000007  a            MATRIX3 0000000000000003  a             O_BROP 000000000000C000  a           SCBITOBJ 0000000000000001  a 
+             KEY_3 0000000000000003  a            MATRIX4 0000000000000004  a           O_DEPTH1 0000000000000000  a               SCLK 0000000000F1A150  a 
+             KEY_4 0000000000000012  a            MATRIX5 0000000000000005  a          O_DEPTH16 0000000000004000  a            SHIFT_L 0000000000000012  a 
+             KEY_5 0000000000000006  a            MATRIX6 0000000000000006  a           O_DEPTH2 0000000000001000  a            SHIFT_R 0000000000000002  a 
+             KEY_6 0000000000000002  a            MATRIX7 0000000000000007  a          O_DEPTH32 0000000000005000  a          SINGLE_GO 0000000000000010  a 
+             KEY_7 0000000000000011  a            MATRIX8 0000000000000008  a           O_DEPTH4 0000000000002000  a        SINGLE_STEP 0000000000000008  a 
+             KEY_8 0000000000000005  a            MATRIX9 0000000000000009  a           O_DEPTH8 0000000000003000  a              SMODE 0000000000F1A154  a 
+             KEY_9 0000000000000001  a             MATROW 0000000000000000  a            O_NOGAP 0000000000008000  a              SRCEN 0000000000000001  a 
+          KEY_HASH 0000000000000000  a            MEMCON1 0000000000F00000  a          O_REFLECT 0000000000002000  a             SRCENX 0000000000000004  a 
+          KEY_STAR 0000000000000010  a            MEMCON2 0000000000F00002  a          O_RELEASE 0000000000010000  a             SRCENZ 0000000000000002  a 
+             LBUFA 0000000000F00800  a         MODMASK128 00000000FFFFFF80  a              O_RMW 0000000000004000  a           SRCSHADE 0000000040000000  a 
+             LBUFB 0000000000F01000  a        MODMASK128K 00000000FFFE0000  a         O_STOPINTS 0000000000000008  a            STOPOBJ 0000000000000004  a 
+             LBUFC 0000000000F01800  a          MODMASK16 00000000FFFFFFF0  a            O_TRANS 0000000000008000  a            StopGPU 0000000000F032E6  a 
+            LEVEL0 0000000000000100  a         MODMASK16K 00000000FFFFC000  a         PAL_HEIGHT 000000000000011F  a              TEST1 0000000000F00056  a 
+             LFU_A 0000000001000000  a          MODMASK1K 00000000FFFFFC00  a           PAL_HMID 000000000000034B  a             TOPBEN 0000000000004000  a 
+            LFU_AN 0000000000800000  a          MODMASK1M 00000000FFF00000  a           PAL_VMID 0000000000000142  a             TOPNEN 0000000000008000  a 
+         LFU_CLEAR 0000000000000000  a           MODMASK2 00000000FFFFFFFE  a          PAL_WIDTH 0000000000000565  a              UPDA1 0000000000000200  a 
+             LFU_D 0000000001400000  a         MODMASK256 00000000FFFFFF00  a            PATDSEL 0000000000010000  a             UPDA1F 0000000000000100  a 
+            LFU_NA 0000000000400000  a        MODMASK256K 00000000FFFC0000  a              PAUSE 000000000000001C  a              UPDA2 0000000000000400  a 
+           LFU_NAN 0000000000200000  a          MODMASK2K 00000000FFFFF800  a               PIT0 0000000000F00050  a              USER0 0000000000000100  a 
+          LFU_NOTD 0000000000A00000  a          MODMASK32 00000000FFFFFFE0  a               PIT1 0000000000F00052  a            USERRAM 0000000000004000  a 
+          LFU_NOTS 0000000000600000  a         MODMASK32K 00000000FFFF8000  a             PITCH1 0000000000000000  a           U_CLRERR 0000000000000006  a 
+          LFU_NSAD 0000000000400000  a           MODMASK4 00000000FFFFFFFC  a             PITCH2 0000000000000001  a              U_ERR 000000000000000F  a 
+         LFU_NSAND 0000000000200000  a          MODMASK4K 00000000FFFFF000  a             PITCH3 0000000000000003  a               U_FE 000000000000000A  a 
+         LFU_NSORD 0000000001600000  a         MODMASK512 00000000FFFFFE00  a             PITCH4 0000000000000002  a          U_MCLRERR 0000000000000040  a 
+        LFU_NSORND 0000000000E00000  a        MODMASK512K 00000000FFF80000  a             PIXEL1 0000000000000000  a             U_MODD 0000000000000001  a 
+       LFU_N_SXORD 0000000001200000  a          MODMASK64 00000000FFFFFFC0  a            PIXEL16 0000000000000020  a           U_MPAREN 0000000000000002  a 
+           LFU_ONE 0000000001E00000  a         MODMASK64K 00000000FFFF0000  a             PIXEL2 0000000000000008  a          U_MRINTEN 0000000000000020  a 
+       LFU_REPLACE 0000000001800000  a           MODMASK8 00000000FFFFFFF8  a            PIXEL32 0000000000000028  a          U_MRXIPOL 0000000000000008  a 
+             LFU_S 0000000001800000  a          MODMASK8K 00000000FFFFE000  a             PIXEL4 0000000000000010  a          U_MTINTEN 0000000000000010  a 
+           LFU_SAD 0000000001000000  a           MOD_MASK 0000000000F1A118  a             PIXEL8 0000000000000018  a           U_MTXBRK 0000000000004000  a 
+          LFU_SAND 0000000000800000  a          NEGA_FLAG 0000000000000004  a            PWIDTH1 0000000000000000  a          U_MTXOPOL 0000000000000004  a 
+          LFU_SORD 0000000001C00000  a        NTSC_HEIGHT 00000000000000F1  a            PWIDTH2 0000000000000200  a              U_ODD 0000000000000000  a 
+         LFU_SORND 0000000001A00000  a          NTSC_HMID 0000000000000337  a            PWIDTH3 0000000000000400  a               U_OE 000000000000000B  a 
+         LFU_SXORD 0000000000C00000  a          NTSC_VMID 000000000000010A  a            PWIDTH4 0000000000000600  a            U_PAREN 0000000000000001  a 
+           LFU_XOR 0000000000C00000  a         NTSC_WIDTH 0000000000000581  a            PWIDTH5 0000000000000800  a               U_PE 0000000000000009  a 
+          LFU_ZERO 0000000000000000  a                OB0 0000000000F00010  a            PWIDTH6 0000000000000A00  a              U_RBF 0000000000000007  a 
+               LPH 0000000000F00008  a                OB1 0000000000F00012  a            PWIDTH7 0000000000000C00  a           U_RINTEN 0000000000000005  a 
+               LPV 0000000000F0000A  a                OB2 0000000000F00014  a            PWIDTH8 0000000000000E00  a           U_RXIPOL 0000000000000003  a 
+              LRXD 0000000000F1A148  a                OB3 0000000000F00016  a            REGPAGE 0000000000004000  a            U_SERIN 000000000000000D  a 
+              LTXD 0000000000F1A148  a                OBF 0000000000F00026  a              RGB16 0000000000000006  a              U_TBE 0000000000000008  a 
+             L_DAC 0000000000F1A14C  a                ODP 0000000000F00024  a              RGB24 0000000000000002  a           U_TINTEN 0000000000000004  a 
+             L_I2S 0000000000F1A148  a                OLP 0000000000F00020  a             RISCGO 0000000000000001  a            U_TXBRK 000000000000000E  a 
+           M0fmptt 0000000000F030A0  a              OLPHI 0000000000F00022  a            ROM_12W 0000000000F1D600  a           U_TXOPOL 0000000000000002  a 
+           M1fmptt 0000000000F03106  a              OLPLO 0000000000F00020  a         ROM_AMSINE 0000000000F1D400  a             VARMOD 0000000000000100  a 
+
+
+                                        src/gpu/stoat.gas    Page 30      5:01:00 pm 29-Sep-2026        RMAC 2.1.01 (Linux/OSX)
+Symbol Table
+
+               VBB 0000000000F00040  a           WIDTH128 0000000000003800  a             ZOFFS6 0000000000000180  a                 xx 0000000000000018 eag
+               VBE 0000000000F00042  a          WIDTH1280 0000000000005200  a             ZOFFS7 00000000000001C0  a               yinc 000000000000000B eag
+                VC 0000000000F00006  a            WIDTH14 0000000000001E00  a              _base 0000000000000000  a             ystart 0000000000000012 eag
+               VDB 0000000000F00046  a          WIDTH1536 0000000000005400  a              _bass 0000000000000002 eag             ystep 0000000000000010 eag
+               VDE 0000000000F00048  a            WIDTH16 0000000000002000  a              _clip 0000000000000002  a                 yy 0000000000000019 eag
+               VEB 0000000000F0004A  a           WIDTH160 0000000000003A00  a              _finc 0000000000000008  a 
+               VEE 0000000000F0004C  a          WIDTH1792 0000000000005600  a             _flags 0000000000000001  a 
+                VI 0000000000F0004E  a           WIDTH192 0000000000003C00  a            _fpixel 0000000000000006  a 
+             VIDEN 0000000000000001  a             WIDTH2 0000000000000800  a             _fstep 0000000000000005  a 
+           VIDTYPE 0000000000000010  a            WIDTH20 0000000000002200  a               _inc 0000000000000007  a 
+             VMODE 0000000000F00028  a          WIDTH2048 0000000000005800  a              _mask 0000000000000002  a 
+                VP 0000000000F0003E  a           WIDTH224 0000000000003E00  a             _pixel 0000000000000003  a 
+                VS 0000000000F00044  a            WIDTH24 0000000000002400  a              _step 0000000000000004  a 
+             WID10 0000000000001A00  a           WIDTH256 0000000000004000  a            _xstart 0000000000000011 eag
+           WID1024 0000000000005000  a          WIDTH2560 0000000000005A00  a               a1_n 000000000000000E eag
+            WID112 0000000000003600  a            WIDTH28 0000000000002600  a               a2_n 000000000000000F eag
+             WID12 0000000000001C00  a          WIDTH3072 0000000000005C00  a            axshear 0000000000000016 eag
+            WID128 0000000000003800  a            WIDTH32 0000000000002800  a            ayshear 0000000000000017 eag
+           WID1280 0000000000005200  a           WIDTH320 0000000000004200  a              backg 0000000000F03FEC  a 
+             WID14 0000000000001E00  a          WIDTH3584 0000000000005E00  a               blit 000000000000000D eag
+           WID1536 0000000000005400  a           WIDTH384 0000000000004400  a         dest_flags 0000000000F03FF0  a 
+             WID16 0000000000002000  a             WIDTH4 0000000000001000  a               diag 0000000000004000  a 
+            WID160 0000000000003A00  a            WIDTH40 0000000000002A00  a              dropx 0000000000000002 eag
+           WID1792 0000000000005600  a           WIDTH448 0000000000004600  a              dropy 0000000000000003 eag
+            WID192 0000000000003C00  a            WIDTH48 0000000000002C00  a              dstxy 0000000000000015 eag
+              WID2 0000000000000800  a           WIDTH512 0000000000004800  a           fontbase 000000000000001E eag
+             WID20 0000000000002200  a            WIDTH56 0000000000002E00  a           gpu_mode 0000000000F03FFC  a 
+           WID2048 0000000000005800  a             WIDTH6 0000000000001400  a         gpu_screen 0000000000F03FF8  a 
+            WID224 0000000000003E00  a            WIDTH64 0000000000003000  a             height 00000000000000F0  a 
+             WID24 0000000000002400  a           WIDTH640 0000000000004A00  a             himask 0000000000000013 eag
+            WID256 0000000000004000  a           WIDTH768 0000000000004C00  a             in_buf 0000000000F03F60  a 
+           WID2560 0000000000005A00  a             WIDTH8 0000000000001800  a             lomask 0000000000000014 eag
+             WID28 0000000000002600  a            WIDTH80 0000000000003200  a               mode 0000000000000009 eag
+           WID3072 0000000000005C00  a           WIDTH896 0000000000004E00  a             mwidth 0000000000000300  a 
+             WID32 0000000000002800  a            WIDTH96 0000000000003400  a               nods 0000000000F032BA  a 
+            WID320 0000000000004200  a              XADD0 0000000000020000  a              nods1 0000000000F03208  a 
+           WID3584 0000000000005E00  a            XADDINC 0000000000030000  a               ntxt 0000000000F032D0  a 
+            WID384 0000000000004400  a            XADDPHR 0000000000000000  a            p_sines 0000000000030000  a 
+              WID4 0000000000001000  a            XADDPIX 0000000000010000  a           pasthack 0000000000F031FA  a 
+             WID40 0000000000002A00  a           XSIGNADD 0000000000000000  a                rex 0000000000F03000  a 
+            WID448 0000000000004600  a           XSIGNSUB 0000000000080000  a             scalex 0000000000000005 eag
+             WID48 0000000000002C00  a              YADD0 0000000000000000  a             scaley 0000000000000006 eag
+            WID512 0000000000004800  a              YADD1 0000000000040000  a             shearx 0000000000000007 eag
+             WID56 0000000000002E00  a           YSIGNADD 0000000000000000  a             sheary 0000000000000008 eag
+              WID6 0000000000001400  a           YSIGNSUB 0000000000100000  a              shrnk 0000000000F031D0  a 
+             WID64 0000000000003000  a              ZBUFF 0000000000002000  a       source_flags 0000000000F03FF4  a 
+            WID640 0000000000004A00  a          ZERO_FLAG 0000000000000001  a             spixel 0000000000000003 eag
+            WID768 0000000000004C00  a            ZMODEEQ 0000000000080000  a              ssize 0000000000000004 eag
+              WID8 0000000000001800  a            ZMODEGT 0000000000100000  a           stoploop 0000000000F032F2  a 
+             WID80 0000000000003200  a            ZMODELT 0000000000040000  a             texter 0000000000F03000  a 
+            WID896 0000000000004E00  a             ZOFFS0 0000000000000000  a           textloop 0000000000F030AA  a 
+             WID96 0000000000003400  a             ZOFFS1 0000000000000040  a            textptr 000000000000001D eag
+           WIDTH10 0000000000001A00  a             ZOFFS2 0000000000000080  a              width 0000000000000180  a 
+         WIDTH1024 0000000000005000  a             ZOFFS3 00000000000000C0  a              x_add 000000000000001A eag
+          WIDTH112 0000000000003600  a             ZOFFS4 0000000000000100  a               xinc 000000000000000A eag
+           WIDTH12 0000000000001C00  a             ZOFFS5 0000000000000140  a              xstep 000000000000000C eag
+

@@ -1,0 +1,21 @@
+.DS_Store
+# build outputs and generated files
+src/bin/
+t2000.abs
+tempest2k_mac.tar.gz
+mac/t2000.abs
+mac/t2000_abs.h
+mac/t2k
+mac/t2k_host
+mac/*.dylib
+mac/Tempest 2000.app/
+mac/T2K.app/
+mac/tvos/build/
+mac/tvos/*.a
+# fetched / cloned by the Makefiles
+rmac/
+rln/
+mac/third_party/
+# Xcode per-user state
+xcuserdata/
+*.xcuserstate
