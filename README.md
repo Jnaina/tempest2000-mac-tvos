@@ -86,8 +86,8 @@ xcrun devicectl device process launch --device <UDID> com.yourname.tempest2000.t
 | Problem | Fix |
 |---|---|
 | `No available simulator runtimes for platform appletvsimulator` while compiling the icon | Install the tvOS platform: `xcodebuild -downloadPlatform tvOS` |
-| `t2000.abs missing from the app bundle` shown on the TV | Step 4 was skipped: copy `t2000.abs` into `mac/tvos/T2KTV/` and build again |
-| `library 'vjcore_dev' not found` / linker errors | Step 3 was skipped: run `./build_core.sh` in `mac/tvos` |
+| `The file “t2000.abs” couldn’t be opened because there is no such file` | Step 2 or 4 was skipped: build `t2000.abs` and copy it into `mac/tvos/T2KTV/` |
+| `clang: error: no such file or directory: '.../libvjcore_dev.a'` | Step 3 was skipped: run `./build_core.sh` in `mac/tvos` |
 | Signing errors / "bundle identifier is not available" | Step 6: pick your team and use your own bundle identifier |
 | Xcode does not list the Apple TV | Repeat step 5; check both devices are on the same network and the Apple TV is awake |
 | App will not launch after a week | Free Apple IDs expire after 7 days: press Run again |
